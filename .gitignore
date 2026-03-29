@@ -1,0 +1,16 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyCharm/IDEA 配置
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# 其他常见忽略项（可选）
+venv/
+.env
+.DS_Store
