@@ -385,21 +385,45 @@ def calculate_decision_loss(y, y_pred, similar_set_ids, normalized_weights, top_
 
 if __name__ == '__main__':
     import Similarity_Set
+    from Sample_Set import Sample_SetProcessor
     import os
     from sklearn.metrics import mean_squared_error
     
-    top_n_num = 10
-    sample_set_size = 20
-    test_num = 6000    
-    max_depth = 3
+    top_n_num = 6
+    # sample_set_size = 20
+    # test_num = 6000    
+    max_depth = 4
 
-    data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'all_waybill_info_meituan.csv')
-    print(f"数据文件路径: {data_path}")
+    data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'all_waybill_info_meituan_v2.csv')
+    # print(f"数据文件路径: {data_path}")
     
     # 加载原始数据
-    df_full = Similarity_Set.load_data(data_path, sample=True, sample_num=test_num, random_state=42)
-    df_example = Similarity_Set.load_data(data_path, sample=True, sample_num=sample_set_size, random_state=2)
+    df_full = Similarity_Set.load_data(data_path, sample=True, sample_num=30000, random_state=42)
+    sample_processor = Sample_SetProcessor(
+        data_path='virtual_dispatch_result_v2.csv',
+        model_path=r'Models\pkl_s\xgboost\xgboost_model.pkl',
+        scaler_path=r'Models\pkl_s\xgboost\scaler.pkl',
+        feature_columns_path=r'Models\pkl_s\xgboost\feature_columns.txt'
+    )
+    df_example = sample_processor.get_order_data(order_id = 522093)
+    df_full_cols = df_full.columns.tolist()
+    df_example_cols = df_example.columns.tolist()
+    print(df_example.head())
+    print("df_full 字段:", df_full_cols)
+    print("---------")
+    print("df_example 字段:", df_example_cols)
     
+    # 检测两个字段是否完全一致
+    if set(df_full_cols) == set(df_example_cols):
+        print("✓ 两个DataFrame的字段完全一致")
+    else:
+        print("✗ 两个DataFrame的字段不一致")
+        only_in_full = set(df_full_cols) - set(df_example_cols)
+        only_in_example = set(df_example_cols) - set(df_full_cols)
+        if only_in_full:
+            print(f"  仅在df_full中存在的字段: {only_in_full}")
+        if only_in_example:
+            print(f"  仅在df_example中存在的字段: {only_in_example}")
     # 按6:4比例划分为训练集和测试集
     df_train, df_test = train_test_split(df_full, test_size=0.4, random_state=42)
     print(f"\n数据划分:")
@@ -433,6 +457,7 @@ if __name__ == '__main__':
     print("="*60)
     
     # 测试不同a值的决策树
+    print("\n测试不同a值的决策树...，a=0为SPOT，a=1.0为传统决策树")
     for a in [0, 1.0]:
         print(f"\n{'='*60}")
         print(f"测试 a={a} 的决策树")
@@ -447,12 +472,12 @@ if __name__ == '__main__':
         # 训练集预测效果
         y_pred_train = tree.predict(X_train)
         mse_train = mean_squared_error(y_train, y_pred_train)
-        # print(f"\n训练集预测值统计:")
-        # print(f"  预测值均值: {y_pred_train.mean():.6f}")
-        # print(f"  预测值标准差: {y_pred_train.std():.6f}")
-        # print(f"  预测值最小值: {y_pred_train.min():.6f}")
-        # print(f"  预测值最大值: {y_pred_train.max():.6f}")
-        # print(f"  预测值唯一值数量: {len(np.unique(y_pred_train))}")
+    #     # print(f"\n训练集预测值统计:")
+    #     # print(f"  预测值均值: {y_pred_train.mean():.6f}")
+    #     # print(f"  预测值标准差: {y_pred_train.std():.6f}")
+    #     # print(f"  预测值最小值: {y_pred_train.min():.6f}")
+    #     # print(f"  预测值最大值: {y_pred_train.max():.6f}")
+    #     # print(f"  预测值唯一值数量: {len(np.unique(y_pred_train))}")
         
         decision_loss_train = calculate_decision_loss(y_train, y_pred_train, similar_set_info_train['similar_set_id'].values, similar_set_info_train['normalized_weight'].values, top_n=tree.top_n, verbose=False)
         
