@@ -60,12 +60,12 @@ class MergeOrderInfo:
         ) / 3600  # 直接相减（都是秒时间戳），转换为小时
         
         # 检查字段是否存在
-        print('字段检查:')
-        print('estimate_arrived_time 存在:', 'estimate_arrived_time' in df_merged.columns)
-        print('dispatch_time 存在:', 'dispatch_time' in df_merged.columns)
-        print('dispatch_to_estimateArrived_tm 存在:', 'dispatch_to_estimateArrived_tm' in df_merged.columns)
-        if 'dispatch_to_estimateArrived_tm' in df_merged.columns:
-            print('dispatch_to_estimateArrived_tm 前5行:', df_merged['dispatch_to_estimateArrived_tm'].head())
+        # print('字段检查:')
+        # print('estimate_arrived_time 存在:', 'estimate_arrived_time' in df_merged.columns)
+        # print('dispatch_time 存在:', 'dispatch_time' in df_merged.columns)
+        # print('dispatch_to_estimateArrived_tm 存在:', 'dispatch_to_estimateArrived_tm' in df_merged.columns)
+        # if 'dispatch_to_estimateArrived_tm' in df_merged.columns:
+        #     print('dispatch_to_estimateArrived_tm 前5行:', df_merged['dispatch_to_estimateArrived_tm'].head())
         
         print(f'订单信息合并完成，数据形状为 {df_merged.shape}')
         print('-----------------')
@@ -851,7 +851,7 @@ if __name__ == '__main__':
         waybill_path=r'0MeiTuan_Data/dispatch_waybill_meituan.csv',
         rider_path=r'0MeiTuan_Data/dispatch_rider_meituan.csv',
         all_info_path=r'0MeiTuan_Data/all_waybill_info_meituan_0322.csv',
-        output_path=r'virtual_dispatch_result_v2.csv',
+        output_path=r'.\Data_Process\Data_Processed\virtual_dispatch_result_v2.csv',
         nearby_count=10
     )
     df_result = processor.process()

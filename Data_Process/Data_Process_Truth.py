@@ -768,6 +768,6 @@ if __name__ == '__main__':
     df = target_feature.target_feature()
 
     # 保存最终的df为csv文件
-    df.to_csv('all_waybill_info_meituan_v2.csv', index=False, encoding='utf-8')
+    df.to_csv(r'.\Data_Process\Data_Processed\all_waybill_info_meituan_v2.csv', index=False, encoding='utf-8')
     print('数据已保存为 all_waybill_info_meituan_v2.csv')
 
