@@ -17,7 +17,7 @@ def load_data(file_path, sample=False, sample_num=500, random_state=42, columns=
     # 区域熟悉度相关特征
     'area_familiarity', 
     # 时间相关特征
-    'is_weekend', 'dispatch_hour', 'dispatch_to_estimateArrived_tm',
+    'is_weekend', 'dispatch_hour',
     # 目标变量
     'reject_penalty_ratio']):
     """
@@ -177,7 +177,7 @@ class SimilarSetBuilder:
 
 if __name__ == '__main__':
     # 加载数据
-    df = load_data(r'all_waybill_info_meituan.csv', sample=True, random_state=42)
+    df = load_data(r'all_waybill_info_meituan.csv')
     df_example = load_data(r'all_waybill_info_meituan.csv', sample=True, sample_num=50, random_state=32)
     
     # 创建相似集构建器
