@@ -1,0 +1,33 @@
+XGBoost模型参数
+==================================================
+
+准确率 (Accuracy):               0.8259
+True Positive Rate (Sensitivity): 0.8375
+True Negative Rate (Specificity): 0.7493
+精确率 (Precision):             0.9566
+F1分数 (F1-Score):              0.8931
+ROC AUC:                        0.8901
+Log Loss (Cross-Entropy):       0.3488
+Gini Index:                     0.7801
+Prevalence:                     0.8683
+Matthews Correlation Coefficient: 0.4648
+
+混淆矩阵：
+[[12436  4160]
+ [17782 91662]]
+
+特征重要性：
+                                                         特征      重要性
+courier_daily_completed_before_dispatch_with_reset_distance 0.263456
+                                           area_familiarity 0.229296
+                                              dispatch_hour 0.129832
+                                      dispatch_to_sender_km 0.113889
+                                   ongoing_cross_area_count 0.049058
+           courier_daily_completed_before_dispatch_distance 0.043564
+                                        ongoing_other_count 0.041619
+                                     sender_to_recipient_km 0.031735
+                                        area_increase_ratio 0.028992
+                                    ongoing_max_distance_km 0.028355
+                                       direction_similarity 0.020967
+                                                 is_weekend 0.011957
+                                           ongoing_area_km2 0.007280

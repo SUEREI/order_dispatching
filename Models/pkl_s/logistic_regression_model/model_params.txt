@@ -1,0 +1,33 @@
+逻辑回归模型参数
+==================================================
+
+准确率 (Accuracy):               0.7268
+True Positive Rate (Sensitivity): 0.7227
+True Negative Rate (Specificity): 0.7535
+精确率 (Precision):             0.9508
+F1分数 (F1-Score):              0.8212
+ROC AUC:                        0.8264
+Log Loss (Cross-Entropy):       0.5076
+Gini Index:                     0.6528
+Prevalence:                     0.8683
+Matthews Correlation Coefficient: 0.3399
+
+混淆矩阵：
+[[12505  4091]
+ [30347 79097]]
+
+特征重要性（回归系数）：
+                                                         特征        系数
+courier_daily_completed_before_dispatch_with_reset_distance  1.562333
+                                      dispatch_to_sender_km -0.814965
+                                           area_familiarity  0.402433
+                                              dispatch_hour -0.219688
+                                        ongoing_other_count -0.171978
+           courier_daily_completed_before_dispatch_distance -0.171451
+                                     sender_to_recipient_km  0.158767
+                                    ongoing_max_distance_km  0.147229
+                                       direction_similarity -0.146318
+                                   ongoing_cross_area_count  0.075564
+                                           ongoing_area_km2  0.071653
+                                        area_increase_ratio -0.021639
+                                                 is_weekend  0.005320
