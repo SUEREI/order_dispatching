@@ -54,6 +54,19 @@ class MergeOrderInfo:
         df_all_unique = df_all_sorted.drop_duplicates(subset=['order_id'], keep='first')
         df_all_subset = df_all_unique[['order_id'] + [col for col in copy_cols if col in df_all_unique.columns]]
         df_merged = self.df_waybill.merge(df_all_subset, on='order_id', how='left', suffixes=('', '_info'))
+        
+        df_merged['dispatch_to_estimateArrived_tm'] = (
+            df_merged['estimate_arrived_time'] - df_merged['dispatch_time']
+        ) / 3600  # 直接相减（都是秒时间戳），转换为小时
+        
+        # 检查字段是否存在
+        print('字段检查:')
+        print('estimate_arrived_time 存在:', 'estimate_arrived_time' in df_merged.columns)
+        print('dispatch_time 存在:', 'dispatch_time' in df_merged.columns)
+        print('dispatch_to_estimateArrived_tm 存在:', 'dispatch_to_estimateArrived_tm' in df_merged.columns)
+        if 'dispatch_to_estimateArrived_tm' in df_merged.columns:
+            print('dispatch_to_estimateArrived_tm 前5行:', df_merged['dispatch_to_estimateArrived_tm'].head())
+        
         print(f'订单信息合并完成，数据形状为 {df_merged.shape}')
         print('-----------------')
         return df_merged
@@ -684,7 +697,8 @@ class VirtualDispatch:
                     'courier_session_completed_distance_km': rider.get('courier_session_completed_distance_km', 0.0),
                     'area_familiarity': rider.get('area_familiarity', 0.0),
                     'is_weekend': order.get('is_weekend', 0),
-                    'dispatch_hour': order.get('dispatch_hour', 0)
+                    'dispatch_hour': order.get('dispatch_hour', 0),
+                    'dispatch_to_estimateArrived_tm': order.get('dispatch_to_estimateArrived_tm', np.nan)
                 }
                 
                 results.append(result_row)
