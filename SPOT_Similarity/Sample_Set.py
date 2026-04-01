@@ -97,10 +97,12 @@ class Sample_SetProcessor:
         self.df = self.df.rename(columns=new_columns)
 
         # 重新排列字段顺序
-        # 保留 order_id 和 dispatch_to_estimateArrived_tm 字段
+        # 保留 order_id、courier_id 和 dispatch_to_estimateArrived_tm 字段
         columns_to_keep = ['order_id'] if 'order_id' in self.df.columns else []
         if 'dispatch_to_estimateArrived_tm' in self.df.columns:
             columns_to_keep.append('dispatch_to_estimateArrived_tm')
+        if 'courier_id' in self.df.columns:
+            columns_to_keep.append('courier_id')
         
         self.df = self.df[column_order + columns_to_keep]
     
@@ -181,6 +183,25 @@ class Sample_SetProcessor:
         # print(f"\n字段过滤完成，保留 {len(self.df_output.columns)} 个字段")
         
         return self.df_output
+
+    def process_viture(self):
+        """
+        处理 Viture 数据集
+        """
+        self.load_data()
+        self.rename_and_reorder_columns()
+
+        feature_columns = [
+            'sender_to_recipient_km', 'dispatch_to_sender_km', 
+            'ongoing_other_count', 'ongoing_cross_area_count', 'ongoing_max_distance_km', 'ongoing_area_km2', 
+            'area_increase_ratio', 'direction_similarity', 
+            'courier_daily_completed_before_dispatch_distance', 'courier_daily_completed_before_dispatch_with_reset_distance',
+            'area_familiarity', 
+            'is_weekend', 'dispatch_hour'
+        ]
+        self.df_output = self.df[['order_id', 'courier_id'] + feature_columns].copy()
+        return self.df_output
+
     
     def get_order_data(self, order_id=None, sample_size=10):
         """
