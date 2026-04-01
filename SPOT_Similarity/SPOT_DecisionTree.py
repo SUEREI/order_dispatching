@@ -392,15 +392,15 @@ if __name__ == '__main__':
     top_n_num = 6
     # sample_set_size = 20
     # test_num = 6000    
-    max_depth = 4
+    max_depth = 3
 
-    data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'all_waybill_info_meituan_v2.csv')
+    data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), r'.\Data_Process\Data_Processed\all_waybill_info_meituan_v2.csv')
     # print(f"数据文件路径: {data_path}")
     
     # 加载原始数据
     df_full = Similarity_Set.load_data(data_path, sample=True, sample_num=30000, random_state=42)
     sample_processor = Sample_SetProcessor(
-        data_path='virtual_dispatch_result_v2.csv',
+        data_path=r'.\Data_Process\Data_Processed\virtual_dispatch_result_v2.csv',
         model_path=r'Models\pkl_s\xgboost\xgboost_model.pkl',
         scaler_path=r'Models\pkl_s\xgboost\scaler.pkl',
         feature_columns_path=r'Models\pkl_s\xgboost\feature_columns.txt'
@@ -472,12 +472,12 @@ if __name__ == '__main__':
         # 训练集预测效果
         y_pred_train = tree.predict(X_train)
         mse_train = mean_squared_error(y_train, y_pred_train)
-    #     # print(f"\n训练集预测值统计:")
-    #     # print(f"  预测值均值: {y_pred_train.mean():.6f}")
-    #     # print(f"  预测值标准差: {y_pred_train.std():.6f}")
-    #     # print(f"  预测值最小值: {y_pred_train.min():.6f}")
-    #     # print(f"  预测值最大值: {y_pred_train.max():.6f}")
-    #     # print(f"  预测值唯一值数量: {len(np.unique(y_pred_train))}")
+        # print(f"\n训练集预测值统计:")
+        # print(f"  预测值均值: {y_pred_train.mean():.6f}")
+        # print(f"  预测值标准差: {y_pred_train.std():.6f}")
+        # print(f"  预测值最小值: {y_pred_train.min():.6f}")
+        # print(f"  预测值最大值: {y_pred_train.max():.6f}")
+        # print(f"  预测值唯一值数量: {len(np.unique(y_pred_train))}")
         
         decision_loss_train = calculate_decision_loss(y_train, y_pred_train, similar_set_info_train['similar_set_id'].values, similar_set_info_train['normalized_weight'].values, top_n=tree.top_n, verbose=False)
         
