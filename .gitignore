@@ -17,6 +17,5 @@ venv/
 *.csv
 *.xlsx
 *.xls
-*.pdf
-*.codeartsdoer
 *.arts
+*.pdf
