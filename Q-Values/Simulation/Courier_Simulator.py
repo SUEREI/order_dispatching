@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class CourierSimulator:
     """骑手模拟器"""
-    def __init__(self, order_df, idle_timeout_minutes=10):
+    def __init__(self, order_df, idle_timeout_minutes=5):
         """
         初始化骑手模拟器
         
@@ -47,41 +47,46 @@ class CourierSimulator:
         events = []
         for courier_id, group in df.groupby('courier_id'):
             # 获取订单时间序列
-            orders = group[['dispatch_time', 'arrive_time', 'grab_lng', 'grab_lat']].values
+            orders = group[['dispatch_time', 'arrive_time', 'grab_lng', 'grab_lat', 'recipient_lng', 'recipient_lat']].values
             
             first_dispatch = pd.Timestamp(orders[0][0])
             last_arrive = pd.Timestamp(orders[0][1])
+            grab_lng = orders[0][2]
+            grab_lat = orders[0][3]
             
             # 骑手第一次上线：假设在第一单派单时间之前 idle_timeout 时刻上线（避免刚上线立刻接单的突兀）
             # 也可直接用 first_dispatch，但略微前置更平滑
             online_time = first_dispatch - self.idle_timeout
-            events.append((online_time, courier_id, 'online'))
+            events.append((online_time, courier_id, 'online', (grab_lng, grab_lat)))
             
             # 扫描后续订单，判断是否有空闲间隔超过阈值
             for i in range(1, len(orders)):
                 current_dispatch = pd.Timestamp(orders[i][0])
                 current_arrive = pd.Timestamp(orders[i][1])
                 gap = current_dispatch - last_arrive
+                grab_lng = orders[i][2]
+                grab_lat = orders[i][3]
+                recipient_lng = orders[i][4]
+                recipient_lat = orders[i][5]
                 
                 if gap > self.idle_timeout:
                     # 骑手在上一单完成后 idle_timeout 时刻下线
                     offline_time = last_arrive + self.idle_timeout
-                    events.append((offline_time, courier_id, 'offline'))
+                    events.append((offline_time, courier_id, 'offline', (recipient_lng, recipient_lat)))
                     
                     # 然后在下一单开始前 idle_timeout 时刻重新上线
                     online_time = current_dispatch - self.idle_timeout
-                    events.append((online_time, courier_id, 'online'))
+                    events.append((online_time, courier_id, 'online', (grab_lng, grab_lat)))
                 
                 last_arrive = current_arrive
             
             # 最后一单后的下线事件
             final_offline = last_arrive + self.idle_timeout
-            events.append((final_offline, courier_id, 'offline'))
+            events.append((final_offline, courier_id, 'offline', (recipient_lng, recipient_lat)))
         
         # 全局按时间排序
         events.sort(key=lambda x: x[0])
         self.events = events
-        logger.info(events)
         
     def get_events_until(self, current_time):
         """
@@ -93,9 +98,9 @@ class CourierSimulator:
         """
         triggered = []
         while self.event_index < len(self.events):
-            t, courier_id, etype = self.events[self.event_index]
+            t, courier_id, etype, pos = self.events[self.event_index]
             if t <= current_time:
-                triggered.append((courier_id, etype))
+                triggered.append((courier_id, etype, pos))
                 self.event_index += 1
             else:
                 break

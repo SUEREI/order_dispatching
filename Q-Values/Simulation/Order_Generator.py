@@ -14,15 +14,15 @@ logger = logging.getLogger(__name__)
 class OrderGenerator:
     """订单生成器"""
     
-    def __init__(self, data_path):
+    def __init__(self, order_df):
         """
         初始化订单生成器
         
         Args:
-            data_path: 清洗后的数据文件路径
+            order_df: 清洗后的数据DataFrame
         """
-        logger.info(f"正在加载订单数据: {data_path}")
-        self.df = pd.read_csv(data_path)
+        logger.info(f"正在加载订单数据")
+        self.df = order_df
         self.df['dispatch_time'] = pd.to_datetime(self.df['dispatch_time'])
         self.orders_by_time = self._group_orders_by_time()
         self.current_time = None
@@ -89,7 +89,8 @@ class OrderGenerator:
 
 if __name__ == '__main__':
     # 测试订单生成器
-    generator = OrderGenerator('Q-values/Data/Data_Processed/cleaned_waybill_info.csv')
+    order_df = pd.read_csv('Q-values/Data/Data_Processed/cleaned_waybill_info.csv')
+    generator = OrderGenerator(order_df)
     start_time, end_time = generator.get_time_range()
     logger.info(f"时间范围: {start_time} 到 {end_time}")
     
