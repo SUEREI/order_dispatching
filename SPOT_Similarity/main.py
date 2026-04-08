@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error
 from SPOT_DecisionTree import calculate_decision_loss
 
 
-def load_data_sample(data_path):
+def load_data_sample(data_path, order_id=522093):
     # 加载样本集
     sample_processor = Sample_SetProcessor(
         data_path=data_path,
@@ -24,18 +24,18 @@ def load_data_sample(data_path):
         scaler_path=r'Models\pkl_s\xgboost\scaler.pkl',
         feature_columns_path=r'Models\pkl_s\xgboost\feature_columns.txt'
     )
-    df_sample = sample_processor.get_order_data(order_id = 522093)
+    df_sample = sample_processor.get_order_data(order_id = order_id)
     df_viture = sample_processor_viture.process_viture()
     return df_sample, df_viture
 
 
-def load_data_all(data_path, data_path_sample):
+def load_data_all(data_path, data_path_sample, order_id):
     # 加载训练数据
     df_full = load_data(data_path, sample=sample, sample_num=sample_num, random_state=random_state)
     print("训练数据加载成功！")
     print("数据形状：", df_full.shape)
     # 加载样本集
-    df_sample, df_viture = load_data_sample(data_path_sample)
+    df_sample, df_viture = load_data_sample(data_path_sample, order_id=order_id)
     print("样本集加载成功！")
     print("数据形状：", df_sample.shape)
     print("Viture数据形状：", df_viture.shape)
@@ -134,11 +134,14 @@ if __name__ == '__main__':
     max_depth = 3
     # 设置训练数据是否抽样
     sample, sample_num, random_state = True, 30000, 42
+    # 样本订单id
+    order_id = 522093
+
 
     # 加载训练数据和样本集
     data_path = r'.\Data_Process\Data_Processed\all_waybill_info_meituan_v2.csv'
     data_path_sample = r'.\Data_Process\Data_Processed\virtual_dispatch_result_v2.csv'
-    df_full, df_sample, df_viture = load_data_all(data_path, data_path_sample)
+    df_full, df_sample, df_viture = load_data_all(data_path, data_path_sample, order_id=order_id)
     # 划分训练集和测试集合
     df_train, df_test = train_test_split(df_full, test_size=0.4, random_state=42)
     print_train_test_split(df_train, df_test)
@@ -179,7 +182,3 @@ if __name__ == '__main__':
 
 
 
-
-    
-
-    
