@@ -2,10 +2,11 @@ import numpy as np
 from datetime import timedelta
 import logging
 import pandas as pd
+from datetime import datetime
 
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class CourierSimulator:
     """骑手模拟器"""
-    def __init__(self, order_df, idle_timeout_minutes=5):
+    def __init__(self, order_df, idle_timeout_minutes=30, buffer_time=5):
         """
         初始化骑手模拟器
         
@@ -25,6 +26,7 @@ class CourierSimulator:
             idle_timeout_minutes: 骑手多久无单即视为下线
         """
         self.idle_timeout = timedelta(minutes=idle_timeout_minutes)
+        self.buffer_time = timedelta(minutes=buffer_time)
         self.events = []  # 列表元素: (time, courier_id, event_type)  event_type: 'online' / 'offline'
         
         self._build_events(order_df)
@@ -53,57 +55,76 @@ class CourierSimulator:
             last_arrive = pd.Timestamp(orders[0][1])
             grab_lng = orders[0][2]
             grab_lat = orders[0][3]
+            recipient_lng = orders[0][4]
+            recipient_lat = orders[0][5]
             
             # 骑手第一次上线：假设在第一单派单时间之前 idle_timeout 时刻上线（避免刚上线立刻接单的突兀）
             # 也可直接用 first_dispatch，但略微前置更平滑
-            online_time = first_dispatch - self.idle_timeout
-            events.append((online_time, courier_id, 'online', (grab_lng, grab_lat)))
+            online_time = first_dispatch - self.buffer_time
+            events.append((online_time, courier_id, 'online', (grab_lng, grab_lat), []))
             
             # 扫描后续订单，判断是否有空闲间隔超过阈值
             for i in range(1, len(orders)):
                 current_dispatch = pd.Timestamp(orders[i][0])
                 current_arrive = pd.Timestamp(orders[i][1])
+                
+                # 计算当前订单前几行数据中的最晚时间节点
+                prev_arrives = [pd.Timestamp(orders[j][1]) for j in range(i)]
+                last_arrive = max(prev_arrives)
+                max_arrive_idx = prev_arrives.index(last_arrive)  # 找到最晚时间对应的索引
+                
                 gap = current_dispatch - last_arrive
                 grab_lng = orders[i][2]
                 grab_lat = orders[i][3]
-                recipient_lng = orders[i][4]
-                recipient_lat = orders[i][5]
+                recipient_lng = orders[max_arrive_idx][4]  # 使用最晚到达订单的recipient坐标
+                recipient_lat = orders[max_arrive_idx][5]
                 
                 if gap > self.idle_timeout:
                     # 骑手在上一单完成后 idle_timeout 时刻下线
-                    offline_time = last_arrive + self.idle_timeout
-                    events.append((offline_time, courier_id, 'offline', (recipient_lng, recipient_lat)))
-                    
+                    offline_time = last_arrive
+                    events.append((offline_time, courier_id, 'offline', (recipient_lng, recipient_lat), []))
+
                     # 然后在下一单开始前 idle_timeout 时刻重新上线
-                    online_time = current_dispatch - self.idle_timeout
-                    events.append((online_time, courier_id, 'online', (grab_lng, grab_lat)))
-                
-                last_arrive = current_arrive
+                    online_time = current_dispatch
+                    events.append((online_time, courier_id, 'online', (grab_lng, grab_lat), []))
             
-            # 最后一单后的下线事件
-            final_offline = last_arrive + self.idle_timeout
-            events.append((final_offline, courier_id, 'offline', (recipient_lng, recipient_lat)))
+            # 最后一单后的下线事件，只有在线状态才下线
+            final_offline = last_arrive
+            events.append((final_offline, courier_id, 'offline', (recipient_lng, recipient_lat), []))
         
         # 全局按时间排序
         events.sort(key=lambda x: x[0])
         self.events = events
+        # 显示第一个骑手的events作为示例
+        if events:
+            first_courier_id = events[0][1]
+            courier_events = [e for e in events if e[1] == first_courier_id]
+            logger.debug(f"骑手 {first_courier_id} 的事件:")
+            for event in courier_events:
+                logger.debug(f"  时间: {event[0]}, 类型: {event[2]}, 位置: {event[3]}")
         
     def get_events_until(self, current_time):
         """
         获取从上次调用后到 current_time (包含) 之间发生的所有骑手事件
+        同一骑手只返回最后的状态
         
         Returns:
-            list of tuple: [(courier_id, event_type), ...] 
+            list of tuple: [(courier_id, event_type), ...]
             event_type: 'online' 或 'offline'
         """
         triggered = []
+        last_status = {}  # 记录每个骑手的最后状态
         while self.event_index < len(self.events):
-            t, courier_id, etype, pos = self.events[self.event_index]
+            t, courier_id, etype, pos, orders = self.events[self.event_index]
             if t <= current_time:
-                triggered.append((courier_id, etype, pos))
+                # 记录该骑手的最后状态
+                last_status[courier_id] = (courier_id, etype, pos, orders)
                 self.event_index += 1
             else:
                 break
+        
+        # 只返回每个骑手的最后状态
+        triggered = list(last_status.values())
         return triggered
 
     def get_next_event_time(self):
@@ -119,3 +140,10 @@ class CourierSimulator:
 if __name__ == '__main__':
     order_df = pd.read_csv('Q-Values\Data\Data_Processed\cleaned_waybill_info.csv')
     courier_simulator = CourierSimulator(order_df)
+    # 测试获取指定时间的骑手事件
+    test_time = datetime(2022, 10, 17, 5, 0, 0)
+    events = courier_simulator.get_events_until(test_time)
+    courier_247_events = [e for e in events if e[0] == 247]
+    logger.debug(f"{test_time} 时刻骑手ID247的事件: {len(courier_247_events)} 个")
+    for event in courier_247_events:
+        logger.debug(f"  骑手ID: {event[0]}, 类型: {event[1]}, 位置: {event[2]}")

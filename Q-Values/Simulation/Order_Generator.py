@@ -5,7 +5,7 @@ import logging
 
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -95,8 +95,10 @@ if __name__ == '__main__':
     logger.info(f"时间范围: {start_time} 到 {end_time}")
     
     # 测试获取指定时间的订单
-    test_time = datetime(2022, 10, 17, 10, 1, 0)
+    test_time = datetime(2022, 10, 17, 2, 0, 0)
     orders = generator.get_orders_at_time(test_time)
     logger.info(f"{test_time} 时刻的订单数量: {len(orders)}")
+
     if orders:
-        logger.info(f"订单: {orders}")
+        for order in orders:
+            logger.info(f"订单: {order}")
