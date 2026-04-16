@@ -105,7 +105,7 @@ print(f"数据保留比例: {len(df_cleaned)/len(df)*100:.2f}%")
 print(f"清洗后数据形状: {df_cleaned.shape}")
 
 # 确保输出目录存在
-output_dir = 'Q-values/Data/Data_Processed'
+output_dir = 'Q_values/Data/Data_Processed'
 os.makedirs(output_dir, exist_ok=True)
 
 # 保存清洗后的数据

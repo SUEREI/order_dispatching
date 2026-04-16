@@ -1,33 +1,27 @@
-import numpy as np
-from datetime import timedelta
-import logging
-import pandas as pd
-from datetime import datetime
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+骑手模拟器
+根据历史订单数据模拟骑手的上下线事件
+"""
 
-# 配置日志
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+from typing import List, Tuple
+import logging
+
+import pandas as pd
+import numpy as np
+from datetime import timedelta, datetime
+
 logger = logging.getLogger(__name__)
 
 
 class CourierSimulator:
     """骑手模拟器"""
     def __init__(self, order_df, idle_timeout_minutes=30, buffer_time=5):
-        """
-        初始化骑手模拟器
-        
-        Args:
-            order_df: DataFrame，必须包含以下字段：
-                - courier_id: 骑手ID
-                - dispatch_time: 派单时间（datetime类型）
-                - arrive_time: 订单到达时间（datetime类型）
-            idle_timeout_minutes: 骑手多久无单即视为下线
-        """
+        """初始化骑手模拟器"""
         self.idle_timeout = timedelta(minutes=idle_timeout_minutes)
         self.buffer_time = timedelta(minutes=buffer_time)
-        self.events = []  # 列表元素: (time, courier_id, event_type)  event_type: 'online' / 'offline'
+        self.events = []
         
         self._build_events(order_df)
         self.event_index = 0  # 用于逐步获取事件
@@ -35,8 +29,8 @@ class CourierSimulator:
         logger.info(f"骑手模拟器初始化完成，共生成 {len(self.events)} 个上下线事件")
         logger.info(f"涉及骑手数: {order_df['courier_id'].nunique()}")
 
-    def _build_events(self, df):
-        """核心逻辑：按骑手分组，扫描订单序列，生成上线/下线事件"""
+    def _build_events(self, df) -> List[Tuple[datetime, str, str, Tuple[str, str], List[dict]]]:
+        """按骑手分组，扫描订单序列，生成上线/下线事件"""
         # 确保时间列是datetime
         df = df.copy()
         if not pd.api.types.is_datetime64_any_dtype(df['dispatch_time']):
@@ -103,47 +97,43 @@ class CourierSimulator:
             for event in courier_events:
                 logger.debug(f"  时间: {event[0]}, 类型: {event[2]}, 位置: {event[3]}")
         
-    def get_events_until(self, current_time):
-        """
-        获取从上次调用后到 current_time (包含) 之间发生的所有骑手事件
-        同一骑手只返回最后的状态
-        
-        Returns:
-            list of tuple: [(courier_id, event_type), ...]
-            event_type: 'online' 或 'offline'
-        """
+    def get_events_at_time(self, current_time: datetime) -> List[Tuple[str, str, Tuple[str, str], List[dict]]]:
+        """增量获取某时间点的骑手上下线情况"""
         triggered = []
-        last_status = {}  # 记录每个骑手的最后状态
         while self.event_index < len(self.events):
             t, courier_id, etype, pos, orders = self.events[self.event_index]
-            if t <= current_time:
-                # 记录该骑手的最后状态
-                last_status[courier_id] = (courier_id, etype, pos, orders)
+            pos = (pos[0] / 10**6, pos[1] / 10**6)
+            if t == current_time:
+                # 记录该骑手的当前状态
+                triggered.append((courier_id, etype, pos, orders))
                 self.event_index += 1
             else:
                 break
-        
-        # 只返回每个骑手的最后状态
-        triggered = list(last_status.values())
+
         return triggered
 
-    def get_next_event_time(self):
+    def get_next_event_time(self) -> datetime:
         """返回下一个事件发生的时间，若没有则返回 None"""
         if self.event_index < len(self.events):
             return self.events[self.event_index][0].to_pydatetime()
+            
         return None
 
     def get_all_courier_ids(self):
         """返回所有出现过的骑手ID"""
-        return list(set([ev[1] for ev in self.events]))
 
-if __name__ == '__main__':
-    order_df = pd.read_csv('Q-Values\Data\Data_Processed\cleaned_waybill_info.csv')
-    courier_simulator = CourierSimulator(order_df)
-    # 测试获取指定时间的骑手事件
-    test_time = datetime(2022, 10, 17, 5, 0, 0)
-    events = courier_simulator.get_events_until(test_time)
-    courier_247_events = [e for e in events if e[0] == 247]
-    logger.debug(f"{test_time} 时刻骑手ID247的事件: {len(courier_247_events)} 个")
-    for event in courier_247_events:
-        logger.debug(f"  骑手ID: {event[0]}, 类型: {event[1]}, 位置: {event[2]}")
+        return list(set([ev[1] for ev in self.events]))
+    
+    def get_earliest_event_time(self) -> datetime:
+        """返回最早的事件时间"""
+        if self.events:
+            return min(event[0] for event in self.events)
+
+        return None
+    
+    def get_latest_event_time(self) -> datetime:
+        """返回最晚的事件时间"""
+        if self.events:
+            return max(event[0] for event in self.events)
+
+        return None
