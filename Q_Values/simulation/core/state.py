@@ -64,7 +64,7 @@ class StateRefresher:
     ) -> Tuple[datetime, str]:
         """
         记录送餐时间
-        骑手到达送餐点后，需要等待4分钟才能将餐送到客户手中。
+        骑手到达送餐点后，需要等待3分钟才能将餐送到客户手中。
         """
         delivery_time = arrival_time + timedelta(seconds=self.DELIVERY_WAIT_TIME)
         special_status = 'waiting_delivery'
@@ -86,21 +86,24 @@ class StateRefresher:
         special_status_end_time = courier.get('special_status_end_time')
         # 无特殊状态
         if special_status == 'none' or special_status is None:
+
             return {'status': 'normal'}
 
         # 检查特殊状态是否结束
         if current_time < special_status_end_time:
             # 特殊状态未结束，继续等待
             remaining_time = (special_status_end_time - current_time).total_seconds()
-            logger.debug(f"骑手 {courier['courier_id']} 处于 {special_status} 状态，"
-                             f"剩余 {remaining_time:.0f} 秒")
+            logger.info(f"骑手 {courier['courier_id']} 处于 {special_status} 状态，"
+                        f"剩余 {remaining_time:.0f} 秒")
+
             return {
                 'status': 'waiting',
                 'remaining_time': remaining_time
             }
+
         else:
             # 特殊状态已结束
-            logger.debug(f"骑手 {courier['courier_id']} 的 {special_status} 状态已结束")
+            # logger.debug(f"骑手 {courier['courier_id']} 的 {special_status} 状态已结束")
             return {
                 'status': 'completed',
                 'type': special_status
@@ -109,18 +112,14 @@ class StateRefresher:
     def refresh_courier(
         self,
         courier: Dict[str, Any],
-        orders_dict: Dict[str, Dict[str, Any]],
         current_time: datetime,
-        time_step: int = None,
-        route: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         刷新单个骑手的状态
         根据路径规划结果，计算骑手在时间步长内的移动，
         判断是否到达路径点，记录取餐送餐时间，更新骑手位置和状态。
         """
-        if time_step is None:
-            time_step = self.TIME_STEP
+        time_step = self.TIME_STEP
         # 初始化更新结果
         updates = {
             'courier_updates': None,
@@ -131,21 +130,22 @@ class StateRefresher:
         special_status_result = self.handle_special_status(courier, current_time)
         if special_status_result['status'] == 'waiting':
             # 处于等待状态，不移动
-            logger.debug(f"骑手 {courier['courier_id']} 处于等待状态，不移动")
+            # logger.debug(f"骑手 {courier['courier_id']} 处于等待状态，不移动")
             updates['courier_updates'] = courier.copy()
+
             return updates
 
         # 如果特殊状态刚结束，清除状态
         if special_status_result['status'] == 'completed':
             courier['special_status'] = 'none'
             courier['special_status_end_time'] = None
-            logger.debug(f"骑手 {courier['courier_id']} 清除特殊状态")
+            # logger.debug(f"骑手 {courier['courier_id']} 清除特殊状态")
 
-        # 如果没有路径，不移动
-        if not route:
-            logger.debug(f"骑手 {courier['courier_id']} 无路径，不移动")
-            updates['courier_updates'] = courier.copy()
-            return updates
+        # # 如果没有路径，不移动
+        # if not route:
+        #     logger.debug(f"骑手 {courier['courier_id']} 无路径，不移动")
+        #     updates['courier_updates'] = courier.copy()
+        #     return updates
 
         # 计算移动距离
         move_distance = self.COURIER_SPEED * 1000 / 3600 * time_step
@@ -154,18 +154,21 @@ class StateRefresher:
         remaining_distance = move_distance
 
         # 遍历路径点
-        for route_point in route:
+        for route_point in courier['route'].copy():
             target_pos = route_point['position']
             distance_to_target = haversine_distance(current_pos, target_pos)
             if distance_to_target <= remaining_distance:
+                # 可以到达该点，从路径中移除
+                courier['route'] = [p for p in courier['route'] if not (p['order_id'] == route_point['order_id'] and p['point_type'] == route_point['point_type'])]
                 # 可以到达该点
                 logger.info(f"骑手 {courier['courier_id']} 到达 "
-                            f"{route_point['point_type']}-{route_point['order_id']}")
+                             f"Order{route_point['order_id']}-{route_point['point_type']}")
                 # 更新位置和剩余距离
                 current_pos = target_pos
                 remaining_distance -= distance_to_target
     
                 # 处理取餐或送餐
+                orders_dict = {order['order_id']: order for order in courier['current_orders']}
                 order_id = route_point['order_id']
                 order = orders_dict.get(order_id)
                 if route_point['point_type'] == 'pickup':
@@ -189,6 +192,7 @@ class StateRefresher:
                     for courier_order in courier['current_orders']:
                         if courier_order['order_id'] == order_id:
                             courier_order.update(order_update)
+
                             break
 
                     # 如果需要等待备餐，设置骑手特殊状态并返回
@@ -197,6 +201,7 @@ class StateRefresher:
                         courier['special_status_end_time'] = pickup_time
                         courier['position'] = current_pos
                         updates['courier_updates'] = courier.copy()
+
                         return updates
 
                 else:
@@ -219,6 +224,7 @@ class StateRefresher:
                     for courier_order in courier['current_orders']:
                         if courier_order['order_id'] == order_id:
                             courier_order.update(order_update)
+
                             break
 
                     # 设置骑手特殊状态（等待送餐）并返回
@@ -231,10 +237,11 @@ class StateRefresher:
 
             else:
                 # 不能到达该点，沿方向移动
-                new_pos = calculate_move_position(current_pos, target_pos, remaining_distance)
+                new_pos = calculate_move_position(current_pos, target_pos, distance_to_target, remaining_distance)
                 current_pos = new_pos
                 remaining_distance = 0
-                logger.debug(f"骑手 {courier['courier_id']} 移动到 {new_pos}")
+                logger.info(f"骑手 {courier['courier_id']} 移动到 {new_pos}")
+
                 break
 
         # 更新骑手位置
@@ -243,41 +250,4 @@ class StateRefresher:
 
         return updates
 
-    def refresh(
-        self,
-        couriers: Dict[str, Dict[str, Any]],
-        orders: Dict[str, Dict[str, Any]],
-        current_time: datetime,
-        time_step: int = None
-    ) -> Dict[str, Any]:
-        """批量刷新所有在线骑手的状态"""
-        if time_step is None:
-            time_step = self.TIME_STEP
-
-        updates = {
-            'courier_updates': {},
-            'order_updates': {}
-        }
-
-        # 遍历所有骑手
-        for courier_id, courier in couriers.items():
-            # 只处理在线骑手
-            if courier.get('status') != 'online':
-                continue
-
-            # 刷新骑手状态
-            result = self.refresh_courier(courier, orders, current_time, time_step)
-
-            # 汇总更新结果
-            if result['courier_updates']:
-                updates['courier_updates'][courier_id] = result['courier_updates']
-
-            for order_update in result['order_updates']:
-                order_id = order_update['order_id']
-                updates['order_updates'][order_id] = order_update
-
-        logger.info(f"状态刷新完成，更新 {len(updates['courier_updates'])} 个骑手，"
-                   f"{len(updates['order_updates'])} 个订单")
-
-        return updates
 

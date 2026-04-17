@@ -5,6 +5,7 @@
 """
 import logging
 from typing import List, Tuple, Dict
+from tqdm import tqdm
 
 import pandas as pd
 from datetime import datetime
@@ -19,32 +20,31 @@ class OrderGenerator:
         """初始化订单生成器"""
         logger.info(f"正在加载订单数据")
         self.df = order_df
-        self.df['dispatch_time'] = pd.to_datetime(self.df['dispatch_time'])
         self.orders_by_time = self._group_orders_by_time()
         self.current_time = None
         logger.info(f"订单数据加载完成，共 {len(self.df)} 条订单")
-    
+        
     def _group_orders_by_time(self) -> Dict[datetime, List[Dict]]:
         """按时间分组订单"""
         orders_by_time = {}
-        for _, row in self.df.iterrows():
-            time_key = row['dispatch_time']
-            if time_key not in orders_by_time:
-                orders_by_time[time_key] = []
-            orders_by_time[time_key].append({
-                'order_id': row['order_id'],
-                'sender_lng': row['sender_lng'] / 10**6,
-                'sender_lat': row['sender_lat'] / 10**6,
-                'recipient_lng': row['recipient_lng'] / 10**6,
-                'recipient_lat': row['recipient_lat'] / 10**6,
-                'dispatch_time': pd.to_datetime(row['dispatch_time']),
-                'estimate_meal_prepare_time': pd.to_datetime(row['estimate_meal_prepare_time']),
-                'estimate_arrived_time': pd.to_datetime(row['estimate_arrived_time']),
-                'status': 'pending',
-                'courier_id': None,
-                'actual_pickup_time': pd.to_datetime('2099-12-31 23:59:59'),
-                'actual_delivery_time': pd.to_datetime('2099-12-31 23:59:59')
-            })
+        for time_key, group in tqdm(self.df.groupby('dispatch_time'), desc="订单分组"):
+            orders_by_time[time_key] = []
+            for _, row in group.iterrows():
+                orders_by_time[time_key].append({
+                    'order_id': row['order_id'],
+                    'sender_lng': row['sender_lng'] / 10**6,
+                    'sender_lat': row['sender_lat'] / 10**6,
+                    'recipient_lng': row['recipient_lng'] / 10**6,
+                    'recipient_lat': row['recipient_lat'] / 10**6,
+                    'dispatch_time': time_key,
+                    'estimate_meal_prepare_time': row['estimate_meal_prepare_time'],
+                    'estimate_arrived_time': row['estimate_arrived_time'],
+                    'status': 'pending',
+                    'courier_id': None,
+                    # pd.to_datetime('2099-12-31 23:59:59')
+                    'actual_pickup_time': pd.NaT,
+                    'actual_delivery_time': pd.NaT
+                })
 
         return orders_by_time
         

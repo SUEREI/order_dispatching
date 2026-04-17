@@ -12,11 +12,11 @@ from utils import haversine_distance
 logger = logging.getLogger(__name__)
 
 
-class OrderDispatcher:
+class OrderDispatcherByDistance:
     """订单分派器"""
     def __init__(self):
         """初始化分派器"""  
-        pass
+        logger.info("基于距离的订单分派器初始化完成")
     
     def dispatch_to_nearest_courier(self, order, available_couriers) -> Tuple[str, float]:
         """将订单分派给最近的可用骑手"""
@@ -38,7 +38,7 @@ class OrderDispatcher:
 
         return nearest_courier
     
-    def dispatch_orders(self, orders, couriers) -> Dict[str, str]:
+    def dispatch_orders_by_distance(self, orders, couriers) -> Dict[str, str]:
         """批量处理订单分派"""
         dispatch_results = {}
         for order in orders:
@@ -48,6 +48,6 @@ class OrderDispatcher:
                 dispatch_results[order['order_id']] = courier_id
                 logger.debug(f"订单 {order['order_id']} 分派给骑手 {courier_id}，距离: {distance:.4f}")
             else:
-                logger.debug(f"订单 {order['order_id']} 无法分派，无可用骑手")
+                logger.error(f"订单 {order['order_id']} 无法分派，无可用骑手")
         
         return dispatch_results

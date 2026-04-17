@@ -97,10 +97,6 @@ class RoutePlanner:
         # 获取骑手当前位置和订单列表
         current_pos = courier['position']
         orders = courier.get('current_orders', [])
-        # 如果没有订单，返回空路径
-        if not orders:
-            logger.debug(f"{courier['courier_id']} 无订单，返回空路径")
-            return []
 
         # 初始化路径和可达点
         route = []
@@ -144,14 +140,14 @@ class RoutePlanner:
                         p['point_type'] == nearest_point['point_type'])
             ]
 
-            logger.info(f"{courier['courier_id']} 路径规划完成，共 {len(route)} 个点")
+            logger.debug(f"{courier['courier_id']} 路径规划完成，共 {len(route)} 个点")
 
         return route
 
     def validate_route(self, route: List[Dict[str, Any]]) -> bool:
         """
         验证路径是否满足先取后送约束
-        对于每个订单，取餐点的访问顺序必须小于送餐点的访问顺序。
+        对于每个订单，取餐点的访问顺序必须小于送餐点的访问顺序
         """
         # 记录每个订单取餐点的访问顺序
         pickup_sequences = {}
