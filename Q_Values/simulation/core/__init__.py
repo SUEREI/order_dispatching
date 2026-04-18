@@ -8,6 +8,8 @@ from core.courier import CourierSimulator
 from core.order_g import OrderGenerator
 from core.order_d_dis import OrderDispatcherByDistance
 from core.order_d_real import OrderDispatcherByRealMatch
+from core.order_d_dqn import OrderDispatcherByDQN
+from core.dqn_network import DQNConfig
 from core.route import RoutePlanner
 from core.state import StateRefresher
 
@@ -17,6 +19,8 @@ __all__ = [
     'OrderGenerator',
     'OrderDispatcherByDistance',
     'OrderDispatcherByRealMatch',
+    'OrderDispatcherByDQN',
+    'DQNConfig',
     'RoutePlanner',
     'StateRefresher'
 ]
