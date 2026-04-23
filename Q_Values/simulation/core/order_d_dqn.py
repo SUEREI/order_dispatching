@@ -20,7 +20,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from core.dqn_network import DQNAgent, DQNConfig
+from dqn.dqn_network import DQNAgent, DQNConfig
 from core.route import RoutePlanner
 from utils import haversine_distance
 
@@ -38,12 +38,7 @@ class OrderDispatcherByDQN:
     STATE_DIM = 21             # 总维度
 
     def __init__(self, route_planner: RoutePlanner, config: DQNConfig = None):
-        """初始化DQN分派器
-
-        Args:
-            route_planner: 路径规划器实例，用于奖励计算中的路径重规划
-            config: DQN超参数配置，为None时使用默认值
-        """
+        """初始化DQN分派器"""
         self.route_planner = route_planner
         self.config = config or DQNConfig()
         self.dqn_agent = DQNAgent(self.STATE_DIM, self.config)
@@ -58,16 +53,7 @@ class OrderDispatcherByDQN:
         couriers: Dict[str, Dict],
         current_time: datetime
     ) -> Dict[str, str]:
-        """批量DQN派单
-
-        Args:
-            orders: 待分配订单列表
-            couriers: 在线骑手字典 {courier_id: courier_dict}
-            current_time: 当前仿真时间
-
-        Returns:
-            派单结果映射 {order_id: courier_id}
-        """
+        """批量DQN派单"""
         dispatch_results = {}
         # 重置临时订单计数
         self.temp_order_counts = {cid: 0 for cid in couriers}
@@ -107,10 +93,15 @@ class OrderDispatcherByDQN:
             # 5. 构建next_state（骑手加入新订单后的状态）
             next_state = self._build_next_state(chosen_courier, order, current_time)
 
-            # 6. 存储经验
+            # 6. 计算done：骑手当前订单为空且曾经有过订单时为True（刚上线时不为done）
+            current_order_count = len(chosen_courier.get('current_orders', []))
+            has_had_orders = chosen_courier.get('has_had_orders', False)
+            done = (current_order_count == 0 and has_had_orders)
+
+            # 7. 存储经验
             chosen_index = candidate_ids.index(chosen_id)
             current_state = states[chosen_index]
-            self.dqn_agent.replay_buffer.push(current_state, chosen_index, reward, next_state)
+            self.dqn_agent.replay_buffer.push(current_state, chosen_index, reward, next_state, done)
 
             # 7. 尝试训练
             if len(self.dqn_agent.replay_buffer) >= self.config.batch_size:
@@ -129,22 +120,68 @@ class OrderDispatcherByDQN:
 
         return dispatch_results
 
+    def dispatch_orders_by_dqn_inference(
+        self,
+        orders: List[Dict],
+        couriers: Dict[str, Dict],
+        current_time: datetime
+    ) -> Dict[str, str]:
+        """批量DQN派单（仅推理，不训练）
+
+        用于已训练模型的测试或实际使用，直接利用Q值选择最优动作。
+
+        Args:
+            orders: 待分配订单列表
+            couriers: 在线骑手字典 {courier_id: courier_dict}
+            current_time: 当前仿真时间
+
+        Returns:
+            派单结果映射 {order_id: courier_id}
+        """
+        dispatch_results = {}
+        self.temp_order_counts = {cid: 0 for cid in couriers}
+
+        for order in orders:
+            candidates = self._select_candidates(order, couriers)
+            if not candidates:
+                logger.debug(f"订单 {order['order_id']} 无可用候选骑手，跳过")
+                continue
+
+            candidate_ids = [cid for cid, _ in candidates]
+            candidate_couriers = [c for _, c in candidates]
+
+            try:
+                states = np.array([
+                    self._build_state(c, order, current_time)
+                    for c in candidate_couriers
+                ], dtype=np.float32)
+                q_values = self.dqn_agent.batch_predict(states)
+            except Exception as e:
+                logger.warning(f"DQN推理失败({e})，退化为距离贪心策略")
+                chosen_id = candidate_ids[0]
+                dispatch_results[order['order_id']] = chosen_id
+                self.temp_order_counts[chosen_id] = self.temp_order_counts.get(chosen_id, 0) + 1
+                continue
+
+            chosen_index = int(np.argmax(q_values))
+            chosen_id = candidate_ids[chosen_index]
+
+            dispatch_results[order['order_id']] = chosen_id
+            self.temp_order_counts[chosen_id] = self.temp_order_counts.get(chosen_id, 0) + 1
+
+            logger.debug(
+                f"订单 {order['order_id']} 分派给骑手 {chosen_id}，"
+                f"Q值: {q_values[chosen_index]:.4f}"
+            )
+
+        return dispatch_results
+
     def _select_candidates(
         self,
         order: Dict,
         couriers: Dict[str, Dict]
     ) -> List[Tuple[str, Dict]]:
-        """筛选候选骑手
-
-        过滤online且未满载的骑手，按到订单取餐点距离升序排序，取前K名。
-
-        Args:
-            order: 待分配订单
-            couriers: 在线骑手字典
-
-        Returns:
-            候选骑手列表 [(courier_id, courier_dict), ...]，按距离升序
-        """
+        """筛选候选骑手"""
         order_pos = (order['sender_lng'], order['sender_lat'])
         max_orders = self.config.max_orders_per_courier
         candidate_count = self.config.candidate_count
@@ -178,21 +215,7 @@ class OrderDispatcherByDQN:
         order: Dict,
         current_time: datetime
     ) -> np.ndarray:
-        """构建状态向量
-
-        结构: [路径点1经度, 路径点1纬度, ..., 路径点8经度, 路径点8纬度,
-               新订单取餐经度, 新订单取餐纬度, 新订单送餐经度, 新订单送餐纬度,
-               可用配送时长]
-        总维度: 21
-
-        Args:
-            courier: 骑手字典
-            order: 新订单字典
-            current_time: 当前仿真时间
-
-        Returns:
-            21维状态向量（归一化后）
-        """
+        """构建状态向量"""
         state = np.zeros(self.STATE_DIM, dtype=np.float32)
 
         # 1. 编码路径点坐标（16维）
@@ -220,18 +243,7 @@ class OrderDispatcherByDQN:
         order: Dict,
         current_time: datetime
     ) -> np.ndarray:
-        """构建骑手接收新订单后的下一状态向量
-
-        临时将新订单加入骑手订单列表，重新规划路径后构建状态。
-
-        Args:
-            courier: 骑手字典
-            order: 新分配的订单
-            current_time: 当前仿真时间
-
-        Returns:
-            21维下一状态向量
-        """
+        """构建骑手接收新订单后的下一状态向量"""
         # 深拷贝骑手订单列表
         temp_orders = copy.deepcopy(courier.get('current_orders', []))
         # 加入新订单（status='pending'）
@@ -254,15 +266,7 @@ class OrderDispatcherByDQN:
         return self._build_state(temp_courier_with_route, order, current_time)
 
     def _calculate_available_time(self, order: Dict, current_time: datetime) -> float:
-        """计算新订单的可用配送时长
-
-        Args:
-            order: 订单字典
-            current_time: 当前仿真时间
-
-        Returns:
-            可用配送时长（秒），若estimate_arrived_time为NaT则返回max_delivery_time
-        """
+        """计算新订单的可用配送时长"""
         estimate_arrived = order.get('estimate_arrived_time')
         if estimate_arrived is None or (isinstance(estimate_arrived, pd.Timestamp) and pd.isna(estimate_arrived)):
             return self.config.max_delivery_time
@@ -274,15 +278,19 @@ class OrderDispatcherByDQN:
 
     def _normalize_lng(self, lng: float) -> float:
         """归一化经度"""
-        if self.config.lng_range == 0:
+        lng_range = self.config.lng_range
+        if lng_range == 0:
+            logger.debug("经度范围为0，无法归一化")
             return 0.0
-        return (lng - self.config.lng_center) / self.config.lng_range
+        return (lng - self.config.lng_center) / lng_range
 
     def _normalize_lat(self, lat: float) -> float:
         """归一化纬度"""
-        if self.config.lat_range == 0:
+        lat_range = self.config.lat_range
+        if lat_range == 0:
+            logger.debug("纬度范围为0，无法归一化")
             return 0.0
-        return (lat - self.config.lat_center) / self.config.lat_range
+        return (lat - self.config.lat_center) / lat_range
 
     def _choose_action(self, q_values: List[float], candidate_ids: List[str]) -> str:
         """ε-贪婪动作选择

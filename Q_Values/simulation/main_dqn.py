@@ -14,9 +14,10 @@ import pandas as pd
 from core import CourierSimulator
 from core import OrderGenerator
 from core import OrderDispatcherByDistance, OrderDispatcherByRealMatch
-from core import OrderDispatcherByDQN, DQNConfig
+from core import OrderDispatcherByDQN
 from core import RoutePlanner
 from core import StateRefresher
+from dqn import DQNConfig
 from utils import haversine_distance
 
 # 配置日志
@@ -84,10 +85,11 @@ class DeliverySimulation:
             self.couriers[cid] = {
                 'courier_id': cid,
                 'status': 'offline',
-                'position': None,  # 上线时会设置初始位置
+                'position': None,
                 'order_increased': False,
                 'current_orders': [],
-                'route': []
+                'route': [],
+                'has_had_orders': False
             }
     
     def _build_dqn_config(self) -> DQNConfig:
@@ -96,10 +98,10 @@ class DeliverySimulation:
         all_lng = pd.concat([self.df['sender_lng'], self.df['recipient_lng']]) / 10**6
         all_lat = pd.concat([self.df['sender_lat'], self.df['recipient_lat']]) / 10**6
         
-        lng_center = all_lng.mean()
-        lat_center = all_lat.mean()
-        lng_range = max(all_lng.max() - lng_center, lng_center - all_lng.min())
-        lat_range = max(all_lat.max() - lat_center, lat_center - all_lat.min())
+        lng_center = all_lng.min()
+        lat_center = all_lat.min()
+        lng_range = all_lng.max() - all_lng.min()
+        lat_range = all_lat.max() - all_lat.min()
         
         # 避免除零
         if lng_range == 0:
@@ -153,6 +155,7 @@ class DeliverySimulation:
             self.couriers[cid]['status'] = etype
             if etype == 'online':
                 self.couriers[cid]['position'] = pos
+                self.couriers[cid]['has_had_orders'] = False
         online_couriers = {cid: info for cid, info in self.couriers.items() if info['status'] == 'online'}
         # logger.info(f"当前时间点 {self.current_time} 的在线骑手数量: {len(online_couriers)}")
         
@@ -174,6 +177,7 @@ class DeliverySimulation:
                     courier_id = dispatch_results[order['order_id']]
                     # 将订单添加到骑手的当前订单列表并更新状态
                     self.couriers[courier_id]['order_increased'] = True
+                    self.couriers[courier_id]['has_had_orders'] = True
                     # 更新骑手池和订单池的配对情况
                     self.couriers[courier_id]['current_orders'].append(order)
                     self.orders[order['order_id']]['courier_id'] = courier_id
@@ -255,13 +259,29 @@ if __name__ == '__main__':
         delivered_orders['actual_revenue'] = delivered_orders.apply(apply_penalty, axis=1)
         avg_revenue = delivered_orders['actual_revenue'].mean()
 
+        delivered_orders['delivery_duration'] = (delivered_orders['actual_delivery_time'] - delivered_orders['dispatch_time']).dt.total_seconds() / 60
+        avg_delivery_duration = delivered_orders['delivery_duration'].mean()
+
+        timeout_orders = delivered_orders[delivered_orders['actual_delivery_time'] > delivered_orders['estimate_arrived_time']]
+        timeout_count = len(timeout_orders)
+        timeout_rate = timeout_count / total_orders
+        avg_overtime = timeout_orders['overtime_minutes'].mean() if timeout_count > 0 else 0
+
         logger.critical(f"总订单数: {total_orders}\n"
                         f"已送达订单数: {len(delivered_orders)}\n"
+                        f"平均配送时长: {avg_delivery_duration:.2f}分钟\n"
                         f"超时订单数: {timeout_count}\n"
                         f"超时率: {timeout_rate:.2%}\n"
+                        f"平均超时时长: {avg_overtime:.2f}分钟\n"
                         f"骑手平均订单收益: {avg_revenue:.2f}")
         
     else:
         logger.critical("没有订单数据，无法计算超时率")
+
+    import os
+    os.makedirs(os.path.dirname(sim.model_path) if sim.model_path else 'Q_Values/simulation/checkpoints', exist_ok=True)
+    save_path = sim.model_path or 'Q_Values\\simulation\\checkpoints\\dqn_model.pth'
+    sim.dispatcher_dqn.save_model(save_path)
+    logger.critical(f"DQN模型已保存到 {save_path}")
     # orders_df.to_csv('Q_Values\simulation\data_processed\simulated_orders.csv', index=False)
     # logger.info(f"订单结果已保存到 Q_Values/simulation/data_processed/simulated_orders.csv")

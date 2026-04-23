@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 class DQNConfig:
     """DQN超参数配置"""
     state_dim: int = 21
-    hidden_dim: int = 128
+    hidden_dim: int = 256
     lr: float = 1e-4
     gamma: float = 0.99
     buffer_capacity: int = 10000
-    batch_size: int = 32
+    batch_size: int = 128
     tau: float = 0.01
     epsilon_start: float = 0.5
     epsilon_decay: float = 0.995
@@ -46,6 +46,7 @@ class DQNConfig:
     lng_range: float = 1.0
     lat_center: float = 0.0
     lat_range: float = 1.0
+    reward_scale: float = 0.2
 
 
 class ReplayBuffer:
@@ -54,19 +55,20 @@ class ReplayBuffer:
     def __init__(self, capacity: int):
         self.buffer = deque(maxlen=capacity)
 
-    def push(self, state: np.ndarray, action: int, reward: float, next_state: np.ndarray):
+    def push(self, state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool = False):
         """存储一条经验"""
-        self.buffer.append((state, action, reward, next_state))
+        self.buffer.append((state, action, reward, next_state, done))
 
-    def sample(self, batch_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def sample(self, batch_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """随机采样一批经验"""
         batch = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states = zip(*batch)
+        states, actions, rewards, next_states, dones = zip(*batch)
         return (
             np.array(states, dtype=np.float32),
             np.array(actions, dtype=np.int64),
             np.array(rewards, dtype=np.float32),
-            np.array(next_states, dtype=np.float32)
+            np.array(next_states, dtype=np.float32),
+            np.array(dones, dtype=np.float32)
         )
 
     def __len__(self) -> int:
@@ -129,22 +131,23 @@ class DQNAgent:
         self.policy_net.train()
         return q_values.cpu().numpy().tolist()
 
-    def update(self, batch: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]) -> float:
+    def update(self, batch: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]) -> float:
         """网络参数更新
 
         Args:
-            batch: (states, actions, rewards, next_states)
+            batch: (states, actions, rewards, next_states, dones)
 
         Returns:
             损失值
         """
         self.training_step += 1
-        states, actions, rewards, next_states = batch
+        states, actions, rewards, next_states, dones = batch
 
         states_t = torch.FloatTensor(states).to(self.device)
         actions_t = torch.LongTensor(actions).to(self.device)
-        rewards_t = torch.FloatTensor(rewards).to(self.device)
+        rewards_t = torch.FloatTensor(rewards).to(self.device) * self.config.reward_scale
         next_states_t = torch.FloatTensor(next_states).to(self.device)
+        dones_t = torch.FloatTensor(dones).to(self.device)
 
         # 当前Q值: Q(s, a)
         current_q = self.policy_net(states_t).squeeze(-1)
@@ -152,7 +155,7 @@ class DQNAgent:
         # 目标Q值: r + γ * Q_target(s', argmax_a Q(s', a))
         with torch.no_grad():
             next_q = self.target_net(next_states_t).squeeze(-1)
-        target_q = rewards_t + self.config.gamma * next_q
+        target_q = rewards_t + (1 - dones_t) * self.config.gamma * next_q
 
         # MSE损失
         loss = nn.MSELoss()(current_q, target_q)

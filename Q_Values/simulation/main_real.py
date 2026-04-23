@@ -223,10 +223,20 @@ if __name__ == '__main__':
         delivered_orders['actual_revenue'] = delivered_orders.apply(apply_penalty, axis=1)
         avg_revenue = delivered_orders['actual_revenue'].mean()
 
+        delivered_orders['delivery_duration'] = (delivered_orders['actual_delivery_time'] - delivered_orders['dispatch_time']).dt.total_seconds() / 60
+        avg_delivery_duration = delivered_orders['delivery_duration'].mean()
+
+        timeout_orders = delivered_orders[delivered_orders['actual_delivery_time'] > delivered_orders['estimate_arrived_time']]
+        timeout_count = len(timeout_orders)
+        timeout_rate = timeout_count / total_orders
+        avg_overtime = timeout_orders['overtime_minutes'].mean() if timeout_count > 0 else 0
+
         logger.critical(f"总订单数: {total_orders}\n"
                         f"已送达订单数: {len(delivered_orders)}\n"
+                        f"平均配送时长: {avg_delivery_duration:.2f}分钟\n"
                         f"超时订单数: {timeout_count}\n"
                         f"超时率: {timeout_rate:.2%}\n"
+                        f"平均超时时长: {avg_overtime:.2f}分钟\n"
                         f"骑手平均订单收益: {avg_revenue:.2f}")
         
     else:
