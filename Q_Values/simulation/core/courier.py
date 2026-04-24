@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class CourierSimulator:
     """骑手模拟器"""
-    def __init__(self, order_df, idle_timeout_minutes=30, buffer_time=5):
+    def __init__(self, order_df, idle_timeout_minutes=30, buffer_time=0):
         """初始化骑手模拟器"""
         self.df = order_df
         self.idle_timeout = timedelta(minutes=idle_timeout_minutes)

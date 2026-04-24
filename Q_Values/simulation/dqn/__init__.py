@@ -1,9 +1,19 @@
-from dqn.dqn_network import DQNConfig, ReplayBuffer, DQNNetwork, DQNAgent
+from actor_network import ActorNetwork
+from critic_network import CriticNetwork
+from replay_buffer import ReplayBuffer
+from agent import Agent
+from state_builder import StateBuilder
+from action_builder import ActionBuilder
+from reward_calculator import RewardCalculator
+
 
 
 __all__ = [
-    "DQNConfig",
+    "ActorNetwork",
+    "CriticNetwork",
     "ReplayBuffer",
-    "DQNNetwork",
-    "DQNAgent"
+    "Agent",
+    "StateBuilder",
+    "ActionBuilder",
+    "RewardCalculator"
 ]
