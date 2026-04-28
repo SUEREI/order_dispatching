@@ -14,7 +14,6 @@ import pandas as pd
 from core import CourierSimulator
 from core import OrderGenerator
 from core import OrderDispatcherByDistance, OrderDispatcherByRealMatch
-from core import OrderDispatcherByDQN
 from core import RoutePlanner
 from core import StateRefresher
 from dqn import DQNConfig

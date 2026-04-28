@@ -1,9 +1,22 @@
-from dqn.dqn_network import DQNConfig, ReplayBuffer, DQNNetwork, DQNAgent
+from dqn.dqn_network import (
+    ActorCriticConfig,
+    ActorCriticAgent,
+    ActorNetwork,
+    CriticNetwork,
+    ReplayBuffer,
+    DQNConfig,
+    DQNAgent,
+    DQNNetwork
+)
 
 
 __all__ = [
-    "DQNConfig",
+    "ActorCriticConfig",
+    "ActorCriticAgent",
+    "ActorNetwork",
+    "CriticNetwork",
     "ReplayBuffer",
-    "DQNNetwork",
-    "DQNAgent"
+    "DQNConfig",
+    "DQNAgent",
+    "DQNNetwork"
 ]
