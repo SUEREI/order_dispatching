@@ -45,10 +45,12 @@ class ActorCriticConfig:
     base_revenue: float = 3.0
     distance_revenue_coeff: float = 1.5
     max_delivery_time: float = 1800.0
-    lng_center: float = 0.0
-    lng_range: float = 1.0
-    lat_center: float = 0.0
-    lat_range: float = 1.0
+    lng_center: float = 174.387
+    lng_max: float = 174.995
+    lng_range: float = lng_max - lng_center
+    lat_center: float = 45.728
+    lat_max: float = 46.073
+    lat_range: float = lat_max - lat_center
     reward_scale: float = 1.0
 
     def __post_init__(self):
