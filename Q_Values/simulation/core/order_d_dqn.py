@@ -109,16 +109,10 @@ class OrderDispatcherByActorCritic:
                     for _ in candidate_couriers
                 ], dtype=np.float32)
 
-                selected_action, log_prob = self.ac_agent.select_action(
-                    states[0],
+                selected_action, log_prob, chosen_index = self.ac_agent.select_action(
+                    states,
                     candidate_actions
                 )
-
-                chosen_index = 0
-                for i, aid in enumerate(candidate_ids):
-                    if np.allclose(selected_action, candidate_actions[i]):
-                        chosen_index = i
-                        break
 
                 chosen_id = candidate_ids[chosen_index]
                 chosen_courier = candidate_couriers[chosen_index]
@@ -176,16 +170,10 @@ class OrderDispatcherByActorCritic:
                     for _ in candidate_couriers
                 ], dtype=np.float32)
 
-                selected_action, _ = self.ac_agent.select_action(
-                    states[0],
+                selected_action, _, chosen_index = self.ac_agent.select_action(
+                    states,
                     candidate_actions
                 )
-
-                chosen_index = 0
-                for i, aid in enumerate(candidate_ids):
-                    if np.allclose(selected_action, candidate_actions[i]):
-                        chosen_index = i
-                        break
 
                 chosen_id = candidate_ids[chosen_index]
 

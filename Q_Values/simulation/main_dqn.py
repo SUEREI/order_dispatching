@@ -5,6 +5,7 @@
 """
 
 import logging
+import os
 from datetime import timedelta
 from itertools import count
 from tqdm import tqdm
@@ -13,11 +14,12 @@ import pandas as pd
 
 from core import CourierSimulator
 from core import OrderGenerator
-from core import OrderDispatcherByDistance, OrderDispatcherByRealMatch
 from core import RoutePlanner
 from core import StateRefresher
-from dqn import DQNConfig
+from core import OrderDispatcherByActorCritic
+from dqn import ActorCriticConfig
 from utils import haversine_distance
+import json
 
 # 配置日志
 logging.basicConfig(
@@ -45,17 +47,15 @@ class DeliverySimulation:
             self.df['estimate_arrived_time'] = pd.to_datetime(self.df['estimate_arrived_time'])
         
         # 初始化生成器
+        self.is_train = True
         self.order_gen = OrderGenerator(self.df)
         self.courier_sim = CourierSimulator(self.df, idle_timeout_minutes)
         # 初始化派单器、路由规划器、状态刷新器
         self.state_refresher = StateRefresher()
-        self.dispatcher_distance = OrderDispatcherByDistance()
-        self.dispatcher_real = OrderDispatcherByRealMatch(self.df)
         self.route_planner = RoutePlanner()
+        self.dispatcher_dqn = OrderDispatcherByActorCritic(self.route_planner, ActorCriticConfig())
         
-        # 统计坐标归一化参数
-        dqn_config = self._build_dqn_config()
-        self.dispatcher_dqn = OrderDispatcherByDQN(self.route_planner, dqn_config)
+        self.model_path = None
         
         
         # 构建骑手池
@@ -90,33 +90,6 @@ class DeliverySimulation:
                 'route': [],
                 'has_had_orders': False
             }
-    
-    def _build_dqn_config(self) -> DQNConfig:
-        """根据数据集统计坐标归一化参数，构建DQNConfig"""
-        # 综合取餐点和送餐点的经纬度（已除以10^6，与OrderGenerator一致）
-        all_lng = pd.concat([self.df['sender_lng'], self.df['recipient_lng']]) / 10**6
-        all_lat = pd.concat([self.df['sender_lat'], self.df['recipient_lat']]) / 10**6
-        
-        lng_center = all_lng.min()
-        lat_center = all_lat.min()
-        lng_range = all_lng.max() - all_lng.min()
-        lat_range = all_lat.max() - all_lat.min()
-        
-        # 避免除零
-        if lng_range == 0:
-            lng_range = 1.0
-        if lat_range == 0:
-            lat_range = 1.0
-        
-        config = DQNConfig(
-            lng_center=lng_center,
-            lng_range=lng_range,
-            lat_center=lat_center,
-            lat_range=lat_range
-        )
-        logger.info(f"DQN归一化参数: lng_center={lng_center:.6f}, lng_range={lng_range:.6f}, "
-                    f"lat_center={lat_center:.6f}, lat_range={lat_range:.6f}")
-        return config
     
     def step(self) -> None:
         """执行一步仿真"""
@@ -166,8 +139,8 @@ class DeliverySimulation:
         
         # 4. 如果 pending_orders 不为空，使用派单器将订单派给最近的骑手
         if self.pending_orders:
-            # 派单给DQN选择的骑手
-            dispatch_results = self.dispatcher_dqn.dispatch_orders_by_dqn(self.pending_orders, online_couriers, current_time)
+            # 派单给ActorCritic选择的骑手
+            dispatch_results = self.dispatcher_dqn.dispatch_orders(self.pending_orders, online_couriers, current_time, self.is_train)
             # logger.debug(f"当前时间点 {self.current_time} 的订单派单结果: {dispatch_results}")
             # 处理分派结果
             dispatched_orders = []
@@ -203,14 +176,103 @@ class DeliverySimulation:
 
 
 if __name__ == '__main__':
-    sim = DeliverySimulation(r'Q_Values/Data/Data_Processed/cleaned_waybill_info.csv')
+    data_path = r'Q_Values/Data/Data_Processed/cleaned_waybill_info.csv'
+    model_path = 'Q_Values\\simulation\\checkpoints\\dqn_model.pth'
+
+    sim = DeliverySimulation(data_path)
+
+    if os.path.exists(model_path) and sim.is_train == False:
+        sim.dispatcher_dqn.ac_agent.load_model(model_path)
+        if sim.dispatcher_dqn.ac_agent.is_train != sim.is_train:
+            if sim.is_train:
+                sim.dispatcher_dqn.ac_agent.set_train_mode()
+            else:
+                sim.dispatcher_dqn.ac_agent.set_eval_mode()
+        logger.critical(f"已加载模型: {model_path} | 模式: {'训练' if sim.is_train else '评估'}")
+    else:
+        logger.critical("未找到已保存的模型，从随机初始化开始")
 
     start_time, end_time = sim.courier_sim.get_earliest_event_time(), sim.courier_sim.get_latest_event_time()
     total_steps = int((end_time - start_time).total_seconds() / 30) if start_time and end_time else None
+    
+    TIME_STEP = 30
+    STEPS_PER_DAY = 86400 // TIME_STEP
+    TRAIN_EVERY_N_DAYS = 1
+
+    last_train_step = 0
+
+    day = 1
+    day_labels = []
+    daily_metrics = {
+        'delivery_duration': [],
+        'overtime_rate': [],
+        'avg_overtime': [],
+        'avg_revenue': []
+    }
 
     i = 1
     for _ in tqdm(count() if not total_steps else range(total_steps), desc="仿真进度"):
         state, reward, done, current_time = sim.step()
+        
+        if i - last_train_step >= STEPS_PER_DAY * TRAIN_EVERY_N_DAYS and sim.is_train:
+            orders_df = pd.DataFrame([o for o in sim.orders.values() if pd.notna(o.get('actual_delivery_time')) and o.get('actual_delivery_time') <= current_time])
+            if len(orders_df) > 0:
+                orders_df['dispatch_time'] = pd.to_datetime(orders_df['dispatch_time'])
+                orders_df['estimate_arrived_time'] = pd.to_datetime(orders_df['estimate_arrived_time'])
+                orders_df['actual_delivery_time'] = pd.to_datetime(orders_df['actual_delivery_time'])
+
+                orders_df['revenue'] = 3 + orders_df.apply(
+                    lambda row: haversine_distance(
+                        (row['sender_lng'], row['sender_lat']),
+                        (row['recipient_lng'], row['recipient_lat'])
+                    ) / 1000, axis=1
+                )
+
+                delivered_orders = orders_df[orders_df['actual_delivery_time'].notna()].copy()
+                delivered_orders['overtime_minutes'] = (delivered_orders['actual_delivery_time'] - delivered_orders['estimate_arrived_time']).dt.total_seconds() / 60
+                delivered_orders['overtime_minutes'] = delivered_orders['overtime_minutes'].apply(lambda x: max(0, x))
+                delivered_orders['delivery_duration'] = (delivered_orders['actual_delivery_time'] - delivered_orders['dispatch_time']).dt.total_seconds() / 60
+
+                timeout_mask = delivered_orders['actual_delivery_time'] > delivered_orders['estimate_arrived_time']
+                timeout_orders = delivered_orders[timeout_mask]
+
+                overtime_rate = len(timeout_orders) / len(delivered_orders)
+                avg_overtime = timeout_orders['overtime_minutes'].mean() if len(timeout_orders) > 0 else 0.0
+
+                def apply_penalty(row):
+                    overtime = row['overtime_minutes']
+                    if overtime <= 10:
+                        return row['revenue'] * 0.9
+                    elif overtime <= 20:
+                        return row['revenue'] * 0.6
+                    else:
+                        return row['revenue'] * 0.5
+
+                delivered_orders['actual_revenue'] = delivered_orders.apply(apply_penalty, axis=1)
+                avg_revenue = delivered_orders['actual_revenue'].mean()
+                avg_delivery_duration = delivered_orders['delivery_duration'].mean()
+
+                day_labels.append(day)
+                daily_metrics['delivery_duration'].append(avg_delivery_duration)
+                daily_metrics['overtime_rate'].append(overtime_rate)
+                daily_metrics['avg_overtime'].append(avg_overtime)
+                daily_metrics['avg_revenue'].append(avg_revenue)
+
+                logger.critical(
+                    f"===== 第 {day} 天结束，训练前指标 =====\n"
+                    f"已送达订单数: {len(delivered_orders)}\n"
+                    f"平均配送时长: {avg_delivery_duration:.2f}分钟\n"
+                    f"超时率: {overtime_rate:.2%}\n"
+                    f"平均超时时长: {avg_overtime:.2f}分钟\n"
+                    f"骑手平均订单收益: {avg_revenue:.2f}")
+
+            if len(sim.dispatcher_dqn.ac_agent.replay_buffer) >= sim.dispatcher_dqn.ac_agent.config.batch_size:
+                logger.info(f"===== 第 {i // STEPS_PER_DAY} 天结束，训练网络 =====")
+                sim.dispatcher_dqn.ac_agent.update_critic_offline()
+                sim.dispatcher_dqn.ac_agent.update_actor_offline()
+                last_train_step = i
+            day += 1
+        
         logger.info(
             f"Step {i}: time={current_time}\n"
             f"----------------------------------\n"
@@ -223,11 +285,62 @@ if __name__ == '__main__':
             )
         # if i == 20:
         if done:
+            if len(sim.dispatcher_dqn.ac_agent.replay_buffer) >= sim.dispatcher_dqn.ac_agent.config.batch_size and sim.is_train:
+                logger.info(f"===== 仿真结束，最终训练网络 =====")
+                sim.dispatcher_dqn.ac_agent.update_critic_offline()
+                sim.dispatcher_dqn.ac_agent.update_actor_offline()
             logger.info(f"仿真结束，总耗时: {current_time - sim.df['dispatch_time'].min()}")
             break
         i += 1
 
-    # 保存订单结果为 CSV
+    if day_labels and sim.is_train:
+        try:
+            import matplotlib.pyplot as plt
+            fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+            axes[0, 0].plot(day_labels, daily_metrics['delivery_duration'], marker='o', linestyle='-', color='tab:blue')
+            axes[0, 0].set_xlabel('天数')
+            axes[0, 0].set_ylabel('平均配送时长 (分钟)')
+            axes[0, 0].set_title('每日平均配送时长')
+            axes[0, 0].grid(True, alpha=0.3)
+
+            axes[0, 1].plot(day_labels, daily_metrics['overtime_rate'], marker='s', linestyle='-', color='tab:red')
+            axes[0, 1].set_xlabel('天数')
+            axes[0, 1].set_ylabel('超时率')
+            axes[0, 1].set_title('每日超时率')
+            axes[0, 1].grid(True, alpha=0.3)
+
+            axes[1, 0].plot(day_labels, daily_metrics['avg_overtime'], marker='^', linestyle='-', color='tab:orange')
+            axes[1, 0].set_xlabel('天数')
+            axes[1, 0].set_ylabel('平均超时时长 (分钟)')
+            axes[1, 0].set_title('每日平均超时时长')
+            axes[1, 0].grid(True, alpha=0.3)
+
+            axes[1, 1].plot(day_labels, daily_metrics['avg_revenue'], marker='d', linestyle='-', color='tab:green')
+            axes[1, 1].set_xlabel('天数')
+            axes[1, 1].set_ylabel('骑手平均订单收益')
+            axes[1, 1].set_title('每日骑手平均订单收益')
+            axes[1, 1].grid(True, alpha=0.3)
+
+            plt.tight_layout()
+            metrics_plot_path = model_path.replace('.pth', '_daily_metrics.png')
+            plt.savefig(metrics_plot_path, dpi=150, bbox_inches='tight')
+            plt.close()
+            logger.critical(f"每日指标曲线已保存到 {metrics_plot_path}")
+        except ImportError:
+            logger.warning("matplotlib 未安装，无法绘制每日指标曲线")
+    elif not sim.is_train:
+        logger.critical("评估模式：不记录每日指标")
+
+    # 保存指标到checkpoints目录
+    checkpoint_dir = os.path.dirname(model_path)
+    metrics_file = os.path.join(checkpoint_dir, 'daily_metrics.json')
+    with open(metrics_file, 'w', encoding='utf-8') as f:
+        json.dump({
+            'day_labels': day_labels,
+            'daily_metrics': daily_metrics
+        }, f, ensure_ascii=False, indent=2)
+
     orders_df = pd.DataFrame([o for o in sim.orders.values() if pd.notna(o.get('order_id'))])
     total_orders = len(orders_df)
     if total_orders > 0:
@@ -273,14 +386,16 @@ if __name__ == '__main__':
                         f"超时率: {timeout_rate:.2%}\n"
                         f"平均超时时长: {avg_overtime:.2f}分钟\n"
                         f"骑手平均订单收益: {avg_revenue:.2f}")
-        
     else:
         logger.critical("没有订单数据，无法计算超时率")
 
-    import os
-    os.makedirs(os.path.dirname(sim.model_path) if sim.model_path else 'Q_Values/simulation/checkpoints', exist_ok=True)
-    save_path = sim.model_path or 'Q_Values\\simulation\\checkpoints\\dqn_model.pth'
-    sim.dispatcher_dqn.save_model(save_path)
-    logger.critical(f"DQN模型已保存到 {save_path}")
-    # orders_df.to_csv('Q_Values\simulation\data_processed\simulated_orders.csv', index=False)
-    # logger.info(f"订单结果已保存到 Q_Values/simulation/data_processed/simulated_orders.csv")
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    sim.dispatcher_dqn.save_model(model_path)
+    logger.critical(f"DQN模型已保存到 {model_path}")
+
+    if sim.is_train and len(sim.dispatcher_dqn.ac_agent.critic_losses) > 0:
+        loss_plot_path = model_path.replace('.pth', '_losses.png')
+        sim.dispatcher_dqn.ac_agent.plot_losses(loss_plot_path)
+        logger.critical(f"损失曲线已保存到 {loss_plot_path}")
+    elif not sim.is_train:
+        logger.critical("评估模式：不保存损失曲线（无训练数据）")
