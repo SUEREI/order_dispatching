@@ -4,14 +4,12 @@
 核心模块
 """
 
-from core.courier import CourierSimulator
-from core.order_g import OrderGenerator
-from core.order_d_dis import OrderDispatcherByDistance
-from core.order_d_real import OrderDispatcherByRealMatch
-from core.order_d_dqn import OrderDispatcherByActorCritic
-from dqn.dqn_network import ActorCriticConfig
-from core.route import RoutePlanner
-from core.state import StateRefresher
+from .courier import CourierSimulator
+from .order_g import OrderGenerator
+from .order_d_dis import OrderDispatcherByDistance
+from .order_d_real import OrderDispatcherByRealMatch
+from .route import RoutePlanner
+from .state import StateRefresher
 
 
 __all__ = [
@@ -20,7 +18,6 @@ __all__ = [
     'OrderDispatcherByDistance',
     'OrderDispatcherByRealMatch',
     'OrderDispatcherByActorCritic',
-    'ActorCriticConfig',
     'RoutePlanner',
     'StateRefresher'
 ]
