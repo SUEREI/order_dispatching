@@ -93,8 +93,8 @@ class StateRefresher:
         if current_time < special_status_end_time:
             # 特殊状态未结束，继续等待
             remaining_time = (special_status_end_time - current_time).total_seconds()
-            logger.info(f"骑手 {courier['courier_id']} 处于 {special_status} 状态，"
-                        f"剩余 {remaining_time:.0f} 秒")
+            # logger.info(f"骑手 {courier['courier_id']} 处于 {special_status} 状态，"
+                        # f"剩余 {remaining_time:.0f} 秒")
 
             return {
                 'status': 'waiting',
@@ -161,8 +161,8 @@ class StateRefresher:
                 # 可以到达该点，从路径中移除
                 courier['route'] = [p for p in courier['route'] if not (p['order_id'] == route_point['order_id'] and p['point_type'] == route_point['point_type'])]
                 # 可以到达该点
-                logger.info(f"骑手 {courier['courier_id']} 到达 "
-                             f"Order{route_point['order_id']}-{route_point['point_type']}")
+                # logger.info(f"骑手 {courier['courier_id']} 到达 "
+                            #  f"Order{route_point['order_id']}-{route_point['point_type']}")
                 # 更新位置和剩余距离
                 current_pos = target_pos
                 remaining_distance -= distance_to_target
@@ -240,7 +240,7 @@ class StateRefresher:
                 new_pos = calculate_move_position(current_pos, target_pos, distance_to_target, remaining_distance)
                 current_pos = new_pos
                 remaining_distance = 0
-                logger.info(f"骑手 {courier['courier_id']} 移动到 {new_pos}")
+                # logger.info(f"骑手 {courier['courier_id']} 移动到 {new_pos}")
 
                 break
 

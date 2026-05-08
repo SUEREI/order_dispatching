@@ -19,3 +19,4 @@ venv/
 *.xls
 *.arts
 *.pdf
+dqn_model.pth

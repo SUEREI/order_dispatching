@@ -58,7 +58,6 @@ class DeliverySimulation:
         # 初始化骑手池
         self._init_couriers()
         # 构建订单池
-        self.orders = self.order_gen.orders_by_time
         self.orders = {order['order_id']: order for orders in self.order_gen.orders_by_time.values() for order in orders}
         
         # 时间轴管理
@@ -164,7 +163,7 @@ class DeliverySimulation:
         if not done:
             self.current_time += timedelta(seconds=30)
         
-        return None, 0, done, current_time
+        return done, current_time
 
 
 if __name__ == '__main__':
@@ -175,7 +174,7 @@ if __name__ == '__main__':
 
     i = 1
     for _ in tqdm(count() if not total_steps else range(total_steps), desc="仿真进度"):
-        state, reward, done, current_time = sim.step()
+        done, current_time = sim.step()
         logger.info(
             f"Step {i}: time={current_time}\n"
             f"----------------------------------\n"
@@ -231,7 +230,7 @@ if __name__ == '__main__':
         timeout_rate = timeout_count / total_orders
         avg_overtime = timeout_orders['overtime_minutes'].mean() if timeout_count > 0 else 0
 
-        logger.critical(f"总订单数: {total_orders}\n"
+        logger.info(f"总订单数: {total_orders}\n"
                         f"已送达订单数: {len(delivered_orders)}\n"
                         f"平均配送时长: {avg_delivery_duration:.2f}分钟\n"
                         f"超时订单数: {timeout_count}\n"
@@ -240,6 +239,6 @@ if __name__ == '__main__':
                         f"骑手平均订单收益: {avg_revenue:.2f}")
         
     else:
-        logger.critical("没有订单数据，无法计算超时率")
+        logger.info("没有订单数据，无法计算超时率")
     # orders_df.to_csv('Q_Values\simulation\data_processed\simulated_orders.csv', index=False)
     # logger.info(f"订单结果已保存到 Q_Values/simulation/data_processed/simulated_orders.csv")

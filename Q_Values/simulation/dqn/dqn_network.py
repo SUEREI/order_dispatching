@@ -29,20 +29,22 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ActorCriticConfig:
     """Actor-Critic 超参数配置"""
-    state_dim: int = 25
+    state_dim: int = 27
     action_dim: int = 5
     actor_hidden_dims: List[int] = None
     critic_hidden_dims: List[int] = None
     lr_actor: float = 1e-3
-    lr_critic: float = 1e-4
-    gamma: float = 0.98
-    buffer_capacity: int = 100000
+    lr_critic: float = 5e-4
+    gamma: float = 0.995
+    buffer_capacity: int = 500000
     batch_size: int = 128
-    critic_epochs: int = 100
+    critic_epochs: int = 200
     actor_epochs: int = 100
     batches_per_epoch: int = 50
     target_update_rate: float = 0.005
     grad_clip_norm: float = 1.0
+    early_stop_patience: int = 5
+    early_stop_threshold: float = 1e-3
     max_orders_per_courier: int = 4
     candidate_count: int = 20
     base_revenue: float = 3.0
@@ -54,13 +56,13 @@ class ActorCriticConfig:
     lat_center: float = 45.728
     lat_max: float = 46.073
     lat_range: float = lat_max - lat_center
-    reward_scale: float = 1.0
+    reward_scale: float = 5.0
 
     def __post_init__(self):
         if self.actor_hidden_dims is None:
-            self.actor_hidden_dims = [128, 64, 32]
+            self.actor_hidden_dims = [256, 128, 256, 128, 64, 32]
         if self.critic_hidden_dims is None:
-            self.critic_hidden_dims = [128, 64, 32]
+            self.critic_hidden_dims = [256, 128, 256, 128, 64 ,32]
 
 
 class ReplayBuffer:
@@ -243,7 +245,7 @@ class ActorCriticAgent:
 
     def __init__(
         self,
-        state_dim: int = 25,
+        state_dim: int = 27,
         action_dim: int = 5,
         config: ActorCriticConfig = None
     ):
@@ -292,12 +294,12 @@ class ActorCriticAgent:
         self.actor_losses = []
 
         device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'
-        logger.critical(f"Actor-Critic 训练设备: {self.device} | {device_name}")
-        logger.critical(f"Actor 网络结构: state_dim={self.state_dim}, action_dim={self.action_dim}, "
+        logger.info(f"Actor-Critic 训练设备: {self.device} | {device_name}")
+        logger.info(f"Actor 网络结构: state_dim={self.state_dim}, action_dim={self.action_dim}, "
                         f"hidden_dims={self.config.actor_hidden_dims}")
-        logger.critical(f"Critic 网络结构: state_dim={self.state_dim}, "
+        logger.info(f"Critic 网络结构: state_dim={self.state_dim}, "
                         f"hidden_dims={self.config.critic_hidden_dims}")
-        logger.critical(f"经验回放缓冲区容量: {self.config.buffer_capacity}, 批次大小: {self.config.batch_size}")
+        logger.info(f"经验回放缓冲区容量: {self.config.buffer_capacity}, 批次大小: {self.config.batch_size}")
 
     def set_train_mode(self) -> None:
         """设置为训练模式"""
@@ -311,31 +313,37 @@ class ActorCriticAgent:
         self.actor.eval()
         self.critic.eval()
 
-    def select_action(
+    def select_courier(
         self,
-        state: np.ndarray,
-        candidate_actions: np.ndarray
+        courier_states: np.ndarray,
+        order_action: np.ndarray
     ) -> Tuple[np.ndarray, Optional[float], int]:
-        """选择动作
+        """选择骑手
+
+        一个订单动作（order_action）对应多个骑手状态（courier_states），
+        为订单选择最合适的骑手。
 
         训练模式: 使用 Softmax 概率采样
-        应用模式: 直接输出 Q 值最高的动作（Argmax），不计算 log_prob
+        应用模式: 直接输出 Q 值最高的骑手（Argmax），不计算 log_prob
 
         Args:
-            state: 状态数组 (state_dim,) 或 (N, state_dim)
-            candidate_actions: 候选动作数组 (N, action_dim)，N个5维动作向量
+            courier_states: 骑手状态数组 (N, state_dim)，N个骑手的状态向量
+            order_action: 订单动作向量 (action_dim,)，5维动作向量（仅一份）
 
         Returns:
             (selected_action, log_prob, chosen_index):
-            - 选中的动作向量 (action_dim,)
+            - 选中的骑手对应的动作向量 (action_dim,)
             - 训练模式下返回 log_prob，评估模式下返回 None
-            - 选中的候选索引
+            - 选中的骑手索引
         """
-        if state.ndim == 1:
-            state = state[np.newaxis, :]
+        if courier_states.ndim == 1:
+            courier_states = courier_states[np.newaxis, :]
 
-        state_tensor = torch.FloatTensor(state).to(self.device)
-        actions_tensor = torch.FloatTensor(candidate_actions).to(self.device)
+        num_couriers = courier_states.shape[0]
+
+        state_tensor = torch.FloatTensor(courier_states).to(self.device)
+        action_tensor = torch.FloatTensor(order_action).to(self.device)
+        actions_tensor = action_tensor.unsqueeze(0).expand(num_couriers, -1)
 
         with torch.no_grad():
             q_values = self.actor(state_tensor, actions_tensor).squeeze(-1)
@@ -346,53 +354,12 @@ class ActorCriticAgent:
             action_idx = dist.sample()
             log_prob = dist.log_prob(action_idx)
             chosen_index = action_idx.item()
-            selected_action = candidate_actions[chosen_index]
+            selected_action = order_action
             return selected_action, log_prob.item(), chosen_index
         else:
             chosen_index = torch.argmax(q_values).item()
-            selected_action = candidate_actions[chosen_index]
+            selected_action = order_action
             return selected_action, None, chosen_index
-
-    def batch_predict(
-        self,
-        states: np.ndarray,
-        candidate_actions: np.ndarray
-    ) -> np.ndarray:
-        """批量预测 Q 值
-
-        用于批量计算多个状态-动作对的 Q 值。
-
-        Args:
-            states: 状态数组 (Batch, state_dim)
-            candidate_actions: 候选动作数组 (Batch, N, action_dim) 或 (N, action_dim)
-
-        Returns:
-            Q 值数组 (Batch,) 或 (N,)
-        """
-        self.actor.eval()
-        with torch.no_grad():
-            if candidate_actions.ndim == 2:
-                states_tensor = torch.FloatTensor(states).to(self.device)
-                actions_tensor = torch.FloatTensor(candidate_actions).to(self.device)
-
-                if states_tensor.size(0) == 1 and actions_tensor.size(0) > 1:
-                    states_tensor = states_tensor.expand(actions_tensor.size(0), -1)
-
-                q_values = self.actor(states_tensor, actions_tensor).squeeze(-1)
-            else:
-                batch_size, num_candidates, action_dim = candidate_actions.shape
-                states_tensor = torch.FloatTensor(states).to(self.device)
-                actions_tensor = torch.FloatTensor(candidate_actions).to(self.device)
-
-                q_values_list = []
-                for i in range(batch_size):
-                    q = self.actor(states_tensor[i], actions_tensor[i]).squeeze(-1)
-                    q_values_list.append(q)
-
-                q_values = torch.stack(q_values_list)
-
-        self.actor.train()
-        return q_values.cpu().numpy()
 
     def update_critic_offline(self) -> float:
         """离线训练 Critic（Step 2）
@@ -415,10 +382,15 @@ class ActorCriticAgent:
 
         total_loss = 0.0
         num_batches = 0
+        prev_epoch_loss = None
+        patience_counter = 0
 
-        batches_per_epoch = self.config.batches_per_epoch
+        batches_per_epoch = max(1, len(self.replay_buffer) // self.config.batch_size)
         for epoch in range(self.config.critic_epochs):
             epoch_loss = 0.0
+            epoch_var_residual = 0.0
+            epoch_var_td = 0.0
+            num_var_batches = 0
             for _ in range(batches_per_epoch):
                 batch = self.replay_buffer.sample(self.config.batch_size)
                 states, actions, rewards, next_states = batch
@@ -448,14 +420,37 @@ class ActorCriticAgent:
                 self.training_step += 1
                 self.critic_losses.append(loss.item())
 
+                with torch.no_grad():
+                    residuals = current_values - td_targets
+                    epoch_var_residual += torch.var(residuals).item()
+                    epoch_var_td += torch.var(td_targets).item()
+                    num_var_batches += 1
+
             avg_epoch_loss = epoch_loss / max(batches_per_epoch, 1)
-            logger.critical(f"Critic 训练 | Epoch {epoch+1}/{self.config.critic_epochs} | "
-                        f"Avg Loss: {avg_epoch_loss:.6f}")
+            avg_var_residual = epoch_var_residual / max(num_var_batches, 1)
+            avg_var_td = epoch_var_td / max(num_var_batches, 1)
+            explained_var = 1.0 - avg_var_residual / max(avg_var_td, 1e-8)
+            logger.info(f"Critic 训练 | Epoch {epoch+1}/{self.config.critic_epochs} | "
+                        f"Avg Loss: {avg_epoch_loss:.6f} | "
+                        f"V(s) Var: {avg_var_td:.4f} | "
+                        f"Explained Var: {explained_var:.4f}")
 
             with torch.no_grad():
                 for param, target_param in zip(self.critic.parameters(), self.target_critic.parameters()):
                     target_param.data.copy_(self.config.target_update_rate * param.data +
                                             (1 - self.config.target_update_rate) * target_param.data)
+
+            if prev_epoch_loss is not None:
+                relative_change = abs(avg_epoch_loss - prev_epoch_loss) / max(abs(prev_epoch_loss), 1e-8)
+                if relative_change < self.config.early_stop_threshold:
+                    patience_counter += 1
+                    if patience_counter >= self.config.early_stop_patience:
+                        logger.info(f"Critic 训练 | 损失波动小于阈值 ({self.config.early_stop_threshold})，"
+                                    f"连续 {self.config.early_stop_patience} 个 epoch，提前停止")
+                        break
+                else:
+                    patience_counter = 0
+            prev_epoch_loss = avg_epoch_loss
 
         avg_loss = total_loss / max(num_batches, 1)
 
@@ -480,8 +475,10 @@ class ActorCriticAgent:
 
         total_loss = 0.0
         num_batches = 0
+        prev_epoch_loss = None
+        patience_counter = 0
 
-        batches_per_epoch = self.config.batches_per_epoch
+        batches_per_epoch = max(1, len(self.replay_buffer) // self.config.batch_size)
         for epoch in range(self.config.actor_epochs):
             epoch_loss = 0.0
             for _ in range(batches_per_epoch):
@@ -494,7 +491,7 @@ class ActorCriticAgent:
                 next_states_t = torch.FloatTensor(next_states).to(self.device)
 
                 with torch.no_grad():
-                    next_values = self.critic(next_states_t).squeeze(-1)
+                    next_values = self.target_critic(next_states_t).squeeze(-1)
                     td_targets = rewards_t + self.gamma * next_values
 
                 q_values = self.actor(states_t, actions_t).squeeze(-1)
@@ -514,8 +511,20 @@ class ActorCriticAgent:
                 self.actor_losses.append(loss.item())
 
             avg_epoch_loss = epoch_loss / max(batches_per_epoch, 1)
-            logger.critical(f"Actor 训练 | Epoch {epoch+1}/{self.config.actor_epochs} | "
+            logger.info(f"Actor 训练 | Epoch {epoch+1}/{self.config.actor_epochs} | "
                         f"Avg Loss: {avg_epoch_loss:.6f}")
+
+            if prev_epoch_loss is not None:
+                relative_change = abs(avg_epoch_loss - prev_epoch_loss) / max(abs(prev_epoch_loss), 1e-8)
+                if relative_change < self.config.early_stop_threshold:
+                    patience_counter += 1
+                    if patience_counter >= self.config.early_stop_patience:
+                        logger.info(f"Actor 训练 | 损失波动小于阈值 ({self.config.early_stop_threshold})，"
+                                    f"连续 {self.config.early_stop_patience} 个 epoch，提前停止")
+                        break
+                else:
+                    patience_counter = 0
+            prev_epoch_loss = avg_epoch_loss
         
         avg_loss = total_loss / max(num_batches, 1)
 

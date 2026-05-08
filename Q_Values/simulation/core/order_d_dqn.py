@@ -4,7 +4,7 @@
 基于 Actor-Critic 的订单分派器模块
 
 该模块实现基于 Actor-Critic 强化学习算法的订单分派器，包括：
-- 状态向量构建（25维：骑手位置+时间+路径点+超时剩余时间）
+- 状态向量构建（27维：骑手位置+时间+路径点+超时剩余时间）
 - 动作向量构建（5维：新订单取餐点+送餐点+可用配送时长）
 - 候选骑手筛选（距离排序Top-K）
 - Q值计算与动作选择（训练模式：Softmax采样，评估模式：Argmax）
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class OrderDispatcherByActorCritic:
     """基于 Actor-Critic 的订单分派器"""
 
-    STATE_DIM = 25
+    STATE_DIM = 27
     ACTION_DIM = 5
 
     MAX_ROUTE_POINTS = 8
@@ -43,7 +43,7 @@ class OrderDispatcherByActorCritic:
     IDX_ROUTE_START = 3
     IDX_ROUTE_END = 18
     IDX_TIMEOUT_START = 19
-    IDX_TIMEOUT_END = 25
+    IDX_TIMEOUT_END = 26
 
     COURIER_SPEED = 30.0
 
@@ -52,7 +52,6 @@ class OrderDispatcherByActorCritic:
         self.route_planner = route_planner
         self.config = config or ActorCriticConfig()
         self.ac_agent = ActorCriticAgent(self.STATE_DIM, self.ACTION_DIM, self.config)
-        self.temp_order_counts: Dict[str, int] = {}
 
         logger.info("Actor-Critic 订单分派器初始化完成")
 
@@ -69,25 +68,12 @@ class OrderDispatcherByActorCritic:
             orders: 待分配订单列表
             couriers: 在线骑手字典 {courier_id: courier_dict}
             current_time: 当前仿真时间
-            is_training: 是否为训练模式
+            is_training: 是否为训练模式（影响是否将经验存入回放缓冲区）
 
         Returns:
             派单结果映射 {order_id: courier_id}
         """
-        if is_training:
-            return self._dispatch_orders_train(orders, couriers, current_time)
-        else:
-            return self._dispatch_orders_eval(orders, couriers, current_time)
-
-    def _dispatch_orders_train(
-        self,
-        orders: List[Dict],
-        couriers: Dict[str, Dict],
-        current_time: datetime
-    ) -> Dict[str, str]:
-        """训练模式批量派单"""
         dispatch_results = {}
-        self.temp_order_counts = {cid: 0 for cid in couriers}
 
         for order in orders:
             candidates = self._select_candidates(order, couriers)
@@ -99,96 +85,46 @@ class OrderDispatcherByActorCritic:
             candidate_couriers = [c for _, c in candidates]
 
             try:
-                states = np.array([
+                courier_states = np.array([
                     self._build_state(c, current_time)
                     for c in candidate_couriers
                 ], dtype=np.float32)
 
-                candidate_actions = np.array([
-                    self._build_action(order, current_time)
-                    for _ in candidate_couriers
-                ], dtype=np.float32)
+                order_action = self._build_action(order, current_time)
 
-                selected_action, log_prob, chosen_index = self.ac_agent.select_action(
-                    states,
-                    candidate_actions
+                selected_action, log_prob, chosen_index = self.ac_agent.select_courier(
+                    courier_states,
+                    order_action
                 )
 
                 chosen_id = candidate_ids[chosen_index]
                 chosen_courier = candidate_couriers[chosen_index]
 
-                reward = self._calculate_reward(chosen_courier, order, current_time)
-                next_state = self._build_next_state(chosen_courier, order, current_time)
-
-                current_state = states[chosen_index]
-                self.ac_agent.replay_buffer.push(current_state, selected_action, reward, next_state)
-
                 dispatch_results[order['order_id']] = chosen_id
-                self.temp_order_counts[chosen_id] = self.temp_order_counts.get(chosen_id, 0) + 1
 
-                logger.debug(
-                    f"订单 {order['order_id']} 分派给骑手 {chosen_id}，"
-                    f"奖励: {reward:.4f}，log_prob: {log_prob:.4f}"
-                )
+                if is_training:
+                    revenue_before = self._calculate_courier_revenue(chosen_courier, current_time)
+
+                chosen_courier['current_orders'].append(order)
+                chosen_courier['route'] = self.route_planner.plan_route(chosen_courier)
+
+                if is_training:
+                    revenue_after = self._calculate_courier_revenue(chosen_courier, current_time)
+                    reward = revenue_after - revenue_before
+                    next_state = self._build_state(chosen_courier, current_time)
+                    current_state = courier_states[chosen_index]
+                    self.ac_agent.replay_buffer.push(current_state, selected_action, reward, next_state)
+                    logger.debug(
+                        f"订单 {order['order_id']} 分派给骑手 {chosen_id}，"
+                        f"奖励: {reward:.4f}，log_prob: {log_prob:.4f}"
+                    )
+                else:
+                    logger.debug(f"订单 {order['order_id']} 分派给骑手 {chosen_id}")
 
             except Exception as e:
                 logger.warning(f"Actor-Critic 推理失败({e})，退化为距离贪心策略")
                 chosen_id = candidate_ids[0]
                 dispatch_results[order['order_id']] = chosen_id
-                self.temp_order_counts[chosen_id] = self.temp_order_counts.get(chosen_id, 0) + 1
-                continue
-
-        return dispatch_results
-
-    def _dispatch_orders_eval(
-        self,
-        orders: List[Dict],
-        couriers: Dict[str, Dict],
-        current_time: datetime
-    ) -> Dict[str, str]:
-        """评估模式批量派单（仅推理，不训练）"""
-        dispatch_results = {}
-        self.temp_order_counts = {cid: 0 for cid in couriers}
-
-        for order in orders:
-            candidates = self._select_candidates(order, couriers)
-            if not candidates:
-                logger.debug(f"订单 {order['order_id']} 无可用候选骑手，跳过")
-                continue
-
-            candidate_ids = [cid for cid, _ in candidates]
-            candidate_couriers = [c for _, c in candidates]
-
-            try:
-                states = np.array([
-                    self._build_state(c, current_time)
-                    for c in candidate_couriers
-                ], dtype=np.float32)
-
-                candidate_actions = np.array([
-                    self._build_action(order, current_time)
-                    for _ in candidate_couriers
-                ], dtype=np.float32)
-
-                selected_action, _, chosen_index = self.ac_agent.select_action(
-                    states,
-                    candidate_actions
-                )
-
-                chosen_id = candidate_ids[chosen_index]
-
-                dispatch_results[order['order_id']] = chosen_id
-                self.temp_order_counts[chosen_id] = self.temp_order_counts.get(chosen_id, 0) + 1
-
-                logger.debug(
-                    f"订单 {order['order_id']} 分派给骑手 {chosen_id}"
-                )
-
-            except Exception as e:
-                logger.warning(f"Actor-Critic 推理失败({e})，退化为距离贪心策略")
-                chosen_id = candidate_ids[0]
-                dispatch_results[order['order_id']] = chosen_id
-                self.temp_order_counts[chosen_id] = self.temp_order_counts.get(chosen_id, 0) + 1
                 continue
 
         return dispatch_results
@@ -211,8 +147,7 @@ class OrderDispatcherByActorCritic:
                 continue
 
             current_count = len(courier.get('current_orders', []))
-            temp_count = self.temp_order_counts.get(cid, 0)
-            if current_count + temp_count >= max_orders:
+            if current_count >= max_orders:
                 continue
 
             distance = haversine_distance(order_pos, courier['position'])
@@ -224,20 +159,20 @@ class OrderDispatcherByActorCritic:
         return candidates
 
     def _build_state(self, courier: Dict, current_time: datetime) -> np.ndarray:
-        """构建25维状态向量
+        """构建27维状态向量
 
         维度分配：
         - 0-1: 骑手当前经度、纬度
         - 2: 当前时间步的时间戳（归一化，如一天中的比例 0~1）
         - 3-18: 路径点1~8的经纬度（共16维）
-        - 19-24: 路径点1~8对应的距离超时的剩余时间（共6维）
+        - 19-26: 路径点1~8对应的距离超时的剩余时间（共6维）
 
         Args:
             courier: 骑手字典
             current_time: 当前仿真时间
 
         Returns:
-            25维状态向量
+            27维状态向量
         """
         state = np.zeros(self.STATE_DIM, dtype=np.float32)
 
@@ -285,28 +220,6 @@ class OrderDispatcherByActorCritic:
         action[4] = available_time / self.config.max_delivery_time
 
         return action
-
-    def _build_next_state(
-        self,
-        courier: Dict,
-        order: Dict,
-        current_time: datetime
-    ) -> np.ndarray:
-        """构建骑手接收新订单后的下一状态向量"""
-        temp_orders = copy.deepcopy(courier.get('current_orders', []))
-        new_order = copy.deepcopy(order)
-        new_order['status'] = 'pending'
-        temp_orders.append(new_order)
-
-        temp_courier = {
-            'courier_id': courier['courier_id'],
-            'position': courier['position'],
-            'current_orders': temp_orders
-        }
-
-        new_route = self.route_planner.plan_route(temp_courier)
-        temp_courier['route'] = new_route
-        return self._build_state(temp_courier, current_time)
 
     def _calculate_available_time(self, order: Dict, current_time: datetime) -> float:
         """计算新订单的可用配送时长"""
@@ -358,48 +271,6 @@ class OrderDispatcherByActorCritic:
             logger.debug("纬度范围为0，无法归一化")
             return 0.0
         return (lat - self.config.lat_center) / lat_range
-
-    def _calculate_reward(
-        self,
-        courier: Dict,
-        order: Dict,
-        current_time: datetime
-    ) -> float:
-        """计算边际收益奖励
-
-        奖励 = 骑手接收新订单后的预期总收益 - 接收前的预期总收益
-
-        Args:
-            courier: 骑手字典
-            order: 新订单字典
-            current_time: 当前仿真时间
-
-        Returns:
-            奖励值
-        """
-        current_revenue = self._calculate_courier_revenue(courier, current_time)
-
-        temp_orders = copy.deepcopy(courier.get('current_orders', []))
-        new_order = copy.deepcopy(order)
-        new_order['status'] = 'pending'
-        temp_orders.append(new_order)
-
-        temp_courier = {
-            'courier_id': courier['courier_id'],
-            'position': courier['position'],
-            'current_orders': temp_orders
-        }
-
-        new_route = self.route_planner.plan_route(temp_courier)
-        if not new_route:
-            logger.debug(f"骑手 {courier['courier_id']} 加入订单 {order['order_id']} 后路径规划失败")
-            return -1.0
-
-        temp_courier['route'] = new_route
-        adjusted_revenue = self._calculate_courier_revenue(temp_courier, current_time)
-
-        reward = adjusted_revenue - current_revenue
-        return reward
 
     def _calculate_courier_revenue(
         self,
@@ -453,12 +324,12 @@ class OrderDispatcherByActorCritic:
                 if estimate_arrived is not None and not pd.isna(estimate_arrived):
                     overtime_minutes = (delivery_times[order_id] - estimate_arrived).total_seconds() / 60
                     if overtime_minutes > 0:
-                        if overtime_minutes <= 10:
-                            order_revenue *= 0.9
-                        elif overtime_minutes <= 20:
-                            order_revenue *= 0.6
-                        else:
+                        if overtime_minutes <= 5:
                             order_revenue *= 0.5
+                        elif overtime_minutes <= 10:
+                            order_revenue *= 0.2
+                        else:
+                            order_revenue = -5
 
             total_revenue += order_revenue
 
