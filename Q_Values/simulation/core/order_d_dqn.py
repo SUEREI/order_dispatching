@@ -104,13 +104,17 @@ class OrderDispatcherByActorCritic:
 
                 if is_training:
                     revenue_before = self._calculate_courier_revenue(chosen_courier, current_time)
+                    distance_before = self._calculate_route_distance(chosen_courier)
 
                 chosen_courier['current_orders'].append(order)
                 chosen_courier['route'] = self.route_planner.plan_route(chosen_courier)
 
                 if is_training:
                     revenue_after = self._calculate_courier_revenue(chosen_courier, current_time)
-                    reward = revenue_after - revenue_before
+                    distance_after = self._calculate_route_distance(chosen_courier)
+                    marginal_revenue = revenue_after - revenue_before
+                    extra_distance_km = (distance_after - distance_before) / 1000.0
+                    reward = marginal_revenue - self.config.distance_penalty_coeff * extra_distance_km
                     next_state = self._build_state(chosen_courier, current_time)
                     current_state = courier_states[chosen_index]
                     self.ac_agent.replay_buffer.push(current_state, selected_action, reward, next_state)
@@ -271,6 +275,31 @@ class OrderDispatcherByActorCritic:
             logger.debug("纬度范围为0，无法归一化")
             return 0.0
         return (lat - self.config.lat_center) / lat_range
+
+    def _calculate_route_distance(
+        self,
+        courier: Dict
+    ) -> float:
+        """计算骑手当前路径的总距离（米）
+
+        Args:
+            courier: 骑手字典（含route）
+
+        Returns:
+            路径总距离（米）
+        """
+        route = courier.get('route', [])
+        current_pos = courier.get('position')
+        if current_pos is None or not route:
+            return 0.0
+
+        total_distance = 0.0
+        for route_point in route:
+            target_pos = route_point['position']
+            total_distance += haversine_distance(current_pos, target_pos)
+            current_pos = target_pos
+
+        return total_distance
 
     def _calculate_courier_revenue(
         self,

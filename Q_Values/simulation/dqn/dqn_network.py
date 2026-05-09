@@ -44,7 +44,7 @@ class ActorCriticConfig:
     target_update_rate: float = 0.005
     grad_clip_norm: float = 1.0
     early_stop_patience: int = 5
-    early_stop_threshold: float = 1e-3
+    early_stop_threshold: float = 1e-2
     max_orders_per_courier: int = 4
     candidate_count: int = 20
     base_revenue: float = 3.0
@@ -57,12 +57,13 @@ class ActorCriticConfig:
     lat_max: float = 46.073
     lat_range: float = lat_max - lat_center
     reward_scale: float = 5.0
+    distance_penalty_coeff: float = 0.3
 
     def __post_init__(self):
         if self.actor_hidden_dims is None:
-            self.actor_hidden_dims = [256, 128, 256, 128, 64, 32]
+            self.actor_hidden_dims = [256, 128, 64]
         if self.critic_hidden_dims is None:
-            self.critic_hidden_dims = [256, 128, 256, 128, 64 ,32]
+            self.critic_hidden_dims = [256, 128, 64]
 
 
 class ReplayBuffer:
@@ -385,7 +386,7 @@ class ActorCriticAgent:
         prev_epoch_loss = None
         patience_counter = 0
 
-        batches_per_epoch = max(1, len(self.replay_buffer) // self.config.batch_size)
+        batches_per_epoch = self.config.batches_per_epoch
         for epoch in range(self.config.critic_epochs):
             epoch_loss = 0.0
             epoch_var_residual = 0.0
@@ -478,7 +479,7 @@ class ActorCriticAgent:
         prev_epoch_loss = None
         patience_counter = 0
 
-        batches_per_epoch = max(1, len(self.replay_buffer) // self.config.batch_size)
+        batches_per_epoch = self.config.batches_per_epoch
         for epoch in range(self.config.actor_epochs):
             epoch_loss = 0.0
             for _ in range(batches_per_epoch):
