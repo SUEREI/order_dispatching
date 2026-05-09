@@ -420,10 +420,11 @@ def main():
     STEPS_PER_DAY = 86400 // TIME_STEP
     TRAIN_EVERY_N_DAYS = 1
     TRAIN_INTERVAL = int(STEPS_PER_DAY * TRAIN_EVERY_N_DAYS)
-    IS_TRAIN = True
+    IS_TRAIN = False
 
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
-    DATE_FILTER = None
+    # DATE_FILTER = None
+    DATE_FILTER = [20221024]
 
     sim = DeliverySimulation(data_path, date_filter=DATE_FILTER, is_train=IS_TRAIN)
     _load_or_init_model(sim, model_path)
