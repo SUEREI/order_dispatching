@@ -424,7 +424,7 @@ def main():
 
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
     # DATE_FILTER = None
-    DATE_FILTER = [20221024]
+    DATE_FILTER = [20221017]
 
     sim = DeliverySimulation(data_path, date_filter=DATE_FILTER, is_train=IS_TRAIN)
     _load_or_init_model(sim, model_path)
