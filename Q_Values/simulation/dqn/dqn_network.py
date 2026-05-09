@@ -548,52 +548,52 @@ class ActorCriticAgent:
         logger.info(f"网络参数已保存到 {path} | actor={save_actor}, critic={save_critic}")
 
     def plot_losses(self, save_path: str = None) -> None:
-        """绘制训练损失曲线
+        """绘制训练损失曲线（以 epoch 为单位）
 
         Args:
             save_path: 保存路径，如果为 None 则显示图表
         """
         try:
             import matplotlib.pyplot as plt
-            
+
             fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-            
-            axes[0].plot(self.critic_losses, alpha=0.6, label='Critic Loss')
-            if len(self.critic_losses) > 10:
+
+            axes[0].plot(self.epoch_critic_losses, alpha=0.6, label='Critic Loss')
+            if len(self.epoch_critic_losses) > 5:
                 smoothed = []
-                window = 10
-                for i in range(len(self.critic_losses)):
+                window = 5
+                for i in range(len(self.epoch_critic_losses)):
                     start = max(0, i - window + 1)
-                    smoothed.append(sum(self.critic_losses[start:i+1]) / (i - start + 1))
+                    smoothed.append(sum(self.epoch_critic_losses[start:i+1]) / (i - start + 1))
                 axes[0].plot(smoothed, label='Critic Loss (Smoothed)', linewidth=2)
-            axes[0].set_xlabel('Batch')
+            axes[0].set_xlabel('Epoch')
             axes[0].set_ylabel('Loss')
             axes[0].set_title('Critic Loss')
             axes[0].legend()
             axes[0].grid(True, alpha=0.3)
-            
-            axes[1].plot(self.actor_losses, alpha=0.6, label='Actor Loss', color='orange')
-            if len(self.actor_losses) > 10:
+
+            axes[1].plot(self.epoch_actor_losses, alpha=0.6, label='Actor Loss', color='orange')
+            if len(self.epoch_actor_losses) > 5:
                 smoothed = []
-                window = 10
-                for i in range(len(self.actor_losses)):
+                window = 5
+                for i in range(len(self.epoch_actor_losses)):
                     start = max(0, i - window + 1)
-                    smoothed.append(sum(self.actor_losses[start:i+1]) / (i - start + 1))
+                    smoothed.append(sum(self.epoch_actor_losses[start:i+1]) / (i - start + 1))
                 axes[1].plot(smoothed, label='Actor Loss (Smoothed)', linewidth=2, color='red')
-            axes[1].set_xlabel('Batch')
+            axes[1].set_xlabel('Epoch')
             axes[1].set_ylabel('Loss')
             axes[1].set_title('Actor Loss')
             axes[1].legend()
             axes[1].grid(True, alpha=0.3)
-            
+
             plt.tight_layout()
-            
+
             if save_path:
                 plt.savefig(save_path, dpi=150, bbox_inches='tight')
                 logger.info(f"损失曲线已保存到 {save_path}")
             else:
                 plt.show()
-                
+
         except ImportError:
             logger.warning("matplotlib 未安装，无法绘制损失曲线")
 
