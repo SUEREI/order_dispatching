@@ -35,13 +35,13 @@ class ActorCriticConfig:
     critic_hidden_dims: List[int] = None
     lr_actor: float = 1e-3
     lr_critic: float = 5e-4
-    gamma: float = 0.995
-    buffer_capacity: int = 500000
+    gamma: float = 0.99
+    buffer_capacity: int = 70000
     batch_size: int = 128
     critic_epochs: int = 200
-    actor_epochs: int = 100
-    batches_per_epoch: int = 50
-    target_update_rate: float = 0.005
+    actor_epochs: int = 30
+    batches_per_epoch: int = buffer_capacity // batch_size
+    target_update_rate: float = 0.01
     grad_clip_norm: float = 1.0
     early_stop_patience: int = 5
     early_stop_threshold: float = 1e-2
@@ -49,14 +49,14 @@ class ActorCriticConfig:
     candidate_count: int = 20
     base_revenue: float = 3.0
     distance_revenue_coeff: float = 1.5
-    max_delivery_time: float = 1800.0
+    max_delivery_time: float = 3600.0
     lng_center: float = 174.387
     lng_max: float = 174.995
     lng_range: float = lng_max - lng_center
     lat_center: float = 45.728
     lat_max: float = 46.073
     lat_range: float = lat_max - lat_center
-    reward_scale: float = 5.0
+    reward_scale: float = 1.0
     distance_penalty_coeff: float = 0.3
 
     def __post_init__(self):
@@ -293,6 +293,8 @@ class ActorCriticAgent:
         
         self.critic_losses = []
         self.actor_losses = []
+        self.epoch_critic_losses = []
+        self.epoch_actor_losses = []
 
         device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'
         logger.info(f"Actor-Critic 训练设备: {self.device} | {device_name}")
@@ -428,6 +430,7 @@ class ActorCriticAgent:
                     num_var_batches += 1
 
             avg_epoch_loss = epoch_loss / max(batches_per_epoch, 1)
+            self.epoch_critic_losses.append(avg_epoch_loss)
             avg_var_residual = epoch_var_residual / max(num_var_batches, 1)
             avg_var_td = epoch_var_td / max(num_var_batches, 1)
             explained_var = 1.0 - avg_var_residual / max(avg_var_td, 1e-8)
@@ -512,6 +515,7 @@ class ActorCriticAgent:
                 self.actor_losses.append(loss.item())
 
             avg_epoch_loss = epoch_loss / max(batches_per_epoch, 1)
+            self.epoch_actor_losses.append(avg_epoch_loss)
             logger.info(f"Actor 训练 | Epoch {epoch+1}/{self.config.actor_epochs} | "
                         f"Avg Loss: {avg_epoch_loss:.6f}")
 
@@ -532,32 +536,16 @@ class ActorCriticAgent:
         return avg_loss
 
     def save_model(self, path: str, save_actor: bool = True, save_critic: bool = True) -> None:
-        """保存模型权重到文件
-
-        Args:
-            path: 保存路径
-            save_actor: 是否保存 Actor 网络
-            save_critic: 是否保存 Critic 网络
-        """
+        """仅保存网络参数到文件"""
         save_dict = {}
         if save_actor:
             save_dict['actor'] = self.actor.state_dict()
         if save_critic:
             save_dict['critic'] = self.critic.state_dict()
             save_dict['target_critic'] = self.target_critic.state_dict()
-        save_dict['is_train'] = self.is_train
-        save_dict['critic_losses'] = self.critic_losses
-        save_dict['actor_losses'] = self.actor_losses
-        buffer_data = []
-        for state, action, reward, next_state in self.replay_buffer.buffer:
-            buffer_data.append((state.tolist(), action.tolist(), reward, next_state.tolist()))
-        save_dict['replay_buffer'] = buffer_data
 
         torch.save(save_dict, path)
-        logger.info(f"Actor-Critic 模型已保存到 {path} | "
-                    f"actor={save_actor}, critic={save_critic}, "
-                    f"critic_losses={len(self.critic_losses)}, actor_losses={len(self.actor_losses)}, "
-                    f"replay_buffer={len(self.replay_buffer)}")
+        logger.info(f"网络参数已保存到 {path} | actor={save_actor}, critic={save_critic}")
 
     def plot_losses(self, save_path: str = None) -> None:
         """绘制训练损失曲线
@@ -610,13 +598,7 @@ class ActorCriticAgent:
             logger.warning("matplotlib 未安装，无法绘制损失曲线")
 
     def load_model(self, path: str, load_actor: bool = True, load_critic: bool = True) -> None:
-        """从文件加载模型权重
-
-        Args:
-            path: 加载路径
-            load_actor: 是否加载 Actor 网络（应用模式下通常只需加载 Actor）
-            load_critic: 是否加载 Critic 网络
-        """
+        """仅从文件加载网络参数"""
         checkpoint = torch.load(path, map_location=self.device, weights_only=True)
 
         if load_actor and 'actor' in checkpoint:
@@ -628,35 +610,5 @@ class ActorCriticAgent:
         if load_critic and 'target_critic' in checkpoint:
             self.target_critic.load_state_dict(checkpoint['target_critic'])
             logger.info(f"Target Critic 网络权重已从 {path} 加载")
-
-        if 'is_train' in checkpoint:
-            self.is_train = checkpoint['is_train']
-            if self.is_train:
-                self.set_train_mode()
-            else:
-                self.set_eval_mode()
-
-        if 'critic_losses' in checkpoint:
-            self.critic_losses = list(checkpoint['critic_losses'])
-        else:
-            self.critic_losses = []
-        if 'actor_losses' in checkpoint:
-            self.actor_losses = list(checkpoint['actor_losses'])
-        else:
-            self.actor_losses = []
-
-        if 'replay_buffer' in checkpoint:
-            buffer_data = checkpoint['replay_buffer']
-            self.replay_buffer.buffer.clear()
-            for state_list, action_list, reward, next_state_list in buffer_data:
-                self.replay_buffer.buffer.append((
-                    np.array(state_list, dtype=np.float32),
-                    np.array(action_list, dtype=np.float32),
-                    reward,
-                    np.array(next_state_list, dtype=np.float32)
-                ))
-            logger.info(f"恢复经验回放缓冲区: {len(self.replay_buffer)} 条经验")
-        else:
-            logger.info(f"未找到已保存的经验回放缓冲区，从空开始")
 
 

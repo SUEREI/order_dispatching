@@ -387,6 +387,28 @@ def _save_loss_curve(sim, model_path):
         logger.info("评估模式：不保存损失曲线（无训练数据）")
 
 
+def _save_loss_json(sim, model_path):
+    """将每个 epoch 的平均损失数据保存到 JSON 文件"""
+    if not sim.is_train:
+        logger.info("评估模式：不保存损失 JSON（无训练数据）")
+        return
+
+    agent = sim.dispatcher_dqn.ac_agent
+    has_data = len(agent.epoch_critic_losses) > 0 or len(agent.epoch_actor_losses) > 0
+    if not has_data:
+        logger.info("无 epoch 损失数据，跳过 JSON 保存")
+        return
+
+    loss_json_path = model_path.replace('.pth', '_losses.json')
+    loss_data = {
+        'epoch_critic_losses': agent.epoch_critic_losses,
+        'epoch_actor_losses': agent.epoch_actor_losses,
+    }
+    with open(loss_json_path, 'w', encoding='utf-8') as f:
+        json.dump(loss_data, f, ensure_ascii=False, indent=2)
+    logger.info(f"Epoch 损失数据已保存到 {loss_json_path}")
+
+
 # ===================== 主流程 =====================
 
 
@@ -396,7 +418,7 @@ def main():
 
     TIME_STEP = 30
     STEPS_PER_DAY = 86400 // TIME_STEP
-    TRAIN_EVERY_N_DAYS = 0.125
+    TRAIN_EVERY_N_DAYS = 1
     TRAIN_INTERVAL = int(STEPS_PER_DAY * TRAIN_EVERY_N_DAYS)
     IS_TRAIN = True
 
@@ -472,6 +494,7 @@ def main():
     logger.info(f"DQN模型已保存到 {model_path}")
 
     _save_loss_curve(sim, model_path)
+    _save_loss_json(sim, model_path)
 
 
 if __name__ == '__main__':
