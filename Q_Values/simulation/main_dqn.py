@@ -312,7 +312,7 @@ def _log_period_summary(period, metrics):
     if metrics is None:
         return
     logger.info(
-        f"===== 第 {period} 个周期(3h)结束，训练前指标 =====\n"
+        f"===== 第 {period} 个周期结束，训练前指标 =====\n"
         f"已送达订单数: {metrics['delivered_count']}\n"
         f"平均配送时长: {metrics['avg_delivery_duration']:.2f}分钟\n"
         f"超时率: {metrics['overtime_rate']:.2%}\n"
@@ -420,11 +420,11 @@ def main():
     STEPS_PER_DAY = 86400 // TIME_STEP
     TRAIN_EVERY_N_DAYS = 1
     TRAIN_INTERVAL = int(STEPS_PER_DAY * TRAIN_EVERY_N_DAYS)
-    IS_TRAIN = False
+    IS_TRAIN = True
 
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
-    # DATE_FILTER = None
-    DATE_FILTER = [20221017]
+    DATE_FILTER = None
+    # DATE_FILTER = [20221017]
 
     sim = DeliverySimulation(data_path, date_filter=DATE_FILTER, is_train=IS_TRAIN)
     _load_or_init_model(sim, model_path)

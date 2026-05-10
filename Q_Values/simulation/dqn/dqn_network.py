@@ -38,13 +38,13 @@ class ActorCriticConfig:
     gamma: float = 0.99
     buffer_capacity: int = 70000
     batch_size: int = 128
-    critic_epochs: int = 200
-    actor_epochs: int = 100
+    critic_epochs: int = 100
+    actor_epochs: int = 50
     batches_per_epoch: int = buffer_capacity // batch_size
     target_update_rate: float = 0.01
     grad_clip_norm: float = 1.0
-    early_stop_patience: int = 3
-    early_stop_threshold: float = 1e-3
+    early_stop_patience: int = 5
+    early_stop_threshold: float = 1e-2
     max_orders_per_courier: int = 4
     candidate_count: int = 300
     base_revenue: float = 3.0
