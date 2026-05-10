@@ -345,16 +345,16 @@ def _plot_period_metrics(period_labels, period_metrics, save_path):
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
         plot_configs = [
-            (0, 0, period_metrics['delivery_duration'], 'Avg Delivery Duration (min)', '3-Hour Avg Delivery Duration', 'tab:blue', 'o'),
-            (0, 1, period_metrics['overtime_rate'], 'Overtime Rate', '3-Hour Overtime Rate', 'tab:red', 's'),
-            (1, 0, period_metrics['avg_overtime'], 'Avg Overtime (min)', '3-Hour Avg Overtime', 'tab:orange', '^'),
-            (1, 1, period_metrics['avg_revenue'], 'Avg Revenue per Order', '3-Hour Avg Revenue', 'tab:green', 'd'),
+            (0, 0, period_metrics['delivery_duration'], 'Avg Delivery Duration (min)', 'Avg Delivery Duration', 'tab:blue', 'o'),
+            (0, 1, period_metrics['overtime_rate'], 'Overtime Rate', 'Overtime Rate', 'tab:red', 's'),
+            (1, 0, period_metrics['avg_overtime'], 'Avg Overtime (min)', 'Avg Overtime', 'tab:orange', '^'),
+            (1, 1, period_metrics['avg_revenue'], 'Avg Revenue per Order', 'Avg Revenue', 'tab:green', 'd'),
         ]
 
         for row, col, data, ylabel, title, color, marker in plot_configs:
             ax = axes[row, col]
             ax.plot(period_labels, data, marker=marker, linestyle='-', color=color)
-            ax.set_xlabel('3-Hour Period')
+            ax.set_xlabel('Period')
             ax.set_ylabel(ylabel)
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
