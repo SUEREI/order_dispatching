@@ -420,11 +420,11 @@ def main():
     STEPS_PER_DAY = 86400 // TIME_STEP
     TRAIN_EVERY_N_DAYS = 1
     TRAIN_INTERVAL = int(STEPS_PER_DAY * TRAIN_EVERY_N_DAYS)
-    IS_TRAIN = True
+    IS_TRAIN = False
 
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
-    DATE_FILTER = None
-    # DATE_FILTER = [20221017]
+    # DATE_FILTER = None
+    DATE_FILTER = [20221024]
 
     sim = DeliverySimulation(data_path, date_filter=DATE_FILTER, is_train=IS_TRAIN)
     _load_or_init_model(sim, model_path)
@@ -452,7 +452,7 @@ def main():
     for step_num in tqdm(step_iter, desc="仿真进度"):
         done, current_time = sim.step()
 
-        # -- 每3小时记录指标并训练 --
+        # -- 每周期记录指标并训练 --
         if step_num - last_train_step >= TRAIN_INTERVAL and sim.is_train:
             orders_df = _orders_to_dataframe(sim.orders, delivered_only=True, current_time=current_time)
             metrics = _compute_delivery_metrics(orders_df)
@@ -491,11 +491,28 @@ def main():
     final_metrics = _compute_delivery_metrics(all_orders_df)
     _log_final_summary(final_metrics)
 
-    sim.dispatcher_dqn.save_model(model_path)
-    logger.info(f"DQN模型已保存到 {model_path}")
+    if not sim.is_train:
+        result_dir = r'Q_Values\simulation\simulation_result'
+        os.makedirs(result_dir, exist_ok=True)
+        result_path = os.path.join(result_dir, 'dqn_dispatch.csv')
 
-    _save_loss_curve(sim, model_path)
-    _save_loss_json(sim, model_path)
+        orders_df = all_orders_df.copy()
+        orders_df['overtime_minutes'] = (
+            orders_df['actual_delivery_time'] - orders_df['estimate_arrived_time']
+        ).dt.total_seconds() / 60
+        orders_df['overtime_minutes'] = orders_df['overtime_minutes'].clip(lower=0)
+        orders_df['delivery_duration'] = (
+            orders_df['actual_delivery_time'] - orders_df['dispatch_time']
+        ).dt.total_seconds() / 60
+        orders_df['actual_revenue'] = orders_df.apply(_apply_overtime_penalty, axis=1)
+        orders_df.to_csv(result_path, index=False)
+        logger.info(f"订单结果已保存到 {result_path}")
+    else:
+        sim.dispatcher_dqn.save_model(model_path)
+        logger.info(f"DQN模型已保存到 {model_path}")
+
+        _save_loss_curve(sim, model_path)
+        _save_loss_json(sim, model_path)
 
 
 if __name__ == '__main__':

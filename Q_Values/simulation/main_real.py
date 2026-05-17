@@ -18,16 +18,28 @@ from core import RoutePlanner
 from core import StateRefresher
 from utils import haversine_distance
 
+
+def _apply_overtime_penalty(row):
+    """根据超时时长对订单收入进行惩罚"""
+    overtime = row['overtime_minutes']
+    if overtime <= 10:
+        return row['revenue'] * 0.9
+    elif overtime <= 20:
+        return row['revenue'] * 0.6
+    else:
+        return row['revenue'] * 0.5
+
+
 # 配置日志
 logging.basicConfig(
-    level=logging.CRITICAL,
+    level=logging.INFO,
     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s'
 )
 logger = logging.getLogger(__name__)
 
 
 class DeliverySimulation:
-    def __init__(self, order_data_path, idle_timeout_minutes=30):
+    def __init__(self, order_data_path, idle_timeout_minutes=30, date_filter=None):
         # 加载数据
         self.df = pd.read_csv(order_data_path)
         self.df = self.df.dropna(subset=['order_id'])
@@ -42,6 +54,11 @@ class DeliverySimulation:
             self.df['estimate_meal_prepare_time'] = pd.to_datetime(self.df['estimate_meal_prepare_time'])
         if not pd.api.types.is_datetime64_any_dtype(self.df['estimate_arrived_time']):
             self.df['estimate_arrived_time'] = pd.to_datetime(self.df['estimate_arrived_time'])
+
+        # 筛选特定日期（在时间列转换之后，在生成器初始化之前）
+        if date_filter is not None:
+            self.df = self.df[self.df['dt'].isin(date_filter)]
+            logger.info(f"按日期筛选: {date_filter}，剩余 {len(self.df)} 条订单")
         
         # 初始化生成器
         self.order_gen = OrderGenerator(self.df)
@@ -163,18 +180,22 @@ class DeliverySimulation:
         if not done:
             self.current_time += timedelta(seconds=30)
         
-        return None, 0, done, current_time
+        return done, current_time
 
 
 if __name__ == '__main__':
-    sim = DeliverySimulation(r'Q_Values/Data/Data_Processed/cleaned_waybill_info.csv')
+    # 按日期筛选：设为 None 使用全部数据，或传入整数列表
+    # DATE_FILTER = None
+    DATE_FILTER = [20221024]
+
+    sim = DeliverySimulation(r'Q_Values/Data/Data_Processed/cleaned_waybill_info.csv', date_filter=DATE_FILTER)
 
     start_time, end_time = sim.courier_sim.get_earliest_event_time(), sim.courier_sim.get_latest_event_time()
     total_steps = int((end_time - start_time).total_seconds() / 30) if start_time and end_time else None
 
     i = 1
     for _ in tqdm(count() if not total_steps else range(total_steps), desc="仿真进度"):
-        state, reward, done, current_time = sim.step()
+        done, current_time = sim.step()
         logger.info(
             f"Step {i}: time={current_time}\n"
             f"----------------------------------\n"
@@ -210,16 +231,7 @@ if __name__ == '__main__':
         timeout_count = len(timeout_orders)
         timeout_rate = timeout_count / total_orders
 
-        def apply_penalty(row):
-            overtime = row['overtime_minutes']
-            if overtime <= 10:
-                return row['revenue'] * 0.9
-            elif overtime <= 20:
-                return row['revenue'] * 0.6
-            else:
-                return row['revenue'] * 0.5
-
-        delivered_orders['actual_revenue'] = delivered_orders.apply(apply_penalty, axis=1)
+        delivered_orders['actual_revenue'] = delivered_orders.apply(_apply_overtime_penalty, axis=1)
         avg_revenue = delivered_orders['actual_revenue'].mean()
 
         delivered_orders['delivery_duration'] = (delivered_orders['actual_delivery_time'] - delivered_orders['dispatch_time']).dt.total_seconds() / 60
@@ -238,7 +250,15 @@ if __name__ == '__main__':
                         f"平均超时时长: {avg_overtime:.2f}分钟\n"
                         f"骑手平均订单收益: {avg_revenue:.2f}")
         
+        orders_df['overtime_minutes'] = (
+            orders_df['actual_delivery_time'] - orders_df['estimate_arrived_time']
+        ).dt.total_seconds() / 60
+        orders_df['overtime_minutes'] = orders_df['overtime_minutes'].clip(lower=0)
+        orders_df['delivery_duration'] = (
+            orders_df['actual_delivery_time'] - orders_df['dispatch_time']
+        ).dt.total_seconds() / 60
+        orders_df['actual_revenue'] = orders_df.apply(_apply_overtime_penalty, axis=1)
+        orders_df.to_csv(r'Q_Values\simulation\simulation_result\real_dispatch.csv', index=False)
+        logger.info(f"订单结果已保存到 Q_Values/simulation/simulation_result/real_dispatch.csv")
     else:
         logger.info("没有订单数据，无法计算超时率")
-    # orders_df.to_csv('Q_Values\simulation\data_processed\simulated_orders.csv', index=False)
-    # logger.info(f"订单结果已保存到 Q_Values/simulation/data_processed/simulated_orders.csv")

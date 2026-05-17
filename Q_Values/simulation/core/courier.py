@@ -74,8 +74,8 @@ class CourierSimulator:
                     online_time = current_dispatch
                     events.append((online_time, courier_id, 'online', (grab_lng, grab_lat)))
             
-            # 最后一单后的下线事件，只有在线状态才下线
-            final_offline = last_arrive
+            # 最后一单后的下线事件
+            final_offline = max(pd.Timestamp(orders[-1][1]), last_arrive)
             events.append((final_offline, courier_id, 'offline', (recipient_lng, recipient_lat)))
         
         # 全局按时间排序
