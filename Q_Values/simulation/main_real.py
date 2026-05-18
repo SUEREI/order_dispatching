@@ -186,7 +186,7 @@ class DeliverySimulation:
 if __name__ == '__main__':
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
     # DATE_FILTER = None
-    DATE_FILTER = [20221024]
+    DATE_FILTER = [20221023]
 
     sim = DeliverySimulation(r'Q_Values/Data/Data_Processed/cleaned_waybill_info.csv', date_filter=DATE_FILTER)
 
