@@ -183,6 +183,7 @@ class DeliverySimulation:
         return done, current_time
 
 
+# ===================== 主流程 =====================
 if __name__ == '__main__':
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
     # DATE_FILTER = None
@@ -212,6 +213,7 @@ if __name__ == '__main__':
             break
         i += 1
 
+    # ==================== 后处理 ====================
     # 保存订单结果为 CSV
     orders_df = pd.DataFrame([o for o in sim.orders.values() if pd.notna(o.get('order_id'))])
     total_orders = len(orders_df)

@@ -368,7 +368,7 @@ def _plot_period_metrics(period_labels, period_metrics, save_path):
 
 
 def _save_period_metrics_json(period_labels, period_metrics, save_dir):
-    """保存每3小时周期指标到JSON文件"""
+    """保存周期指标到JSON文件"""
     metrics_file = os.path.join(save_dir, 'period_metrics.json')
     with open(metrics_file, 'w', encoding='utf-8') as f:
         json.dump({
