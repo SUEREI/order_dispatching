@@ -172,15 +172,6 @@ def time_convert(df, time_columns):
     return df_cleaned
 
 
-def save_csv(df, output_dir, df_name):
-    """保存数据"""
-    # 确保输出目录存在
-    os.makedirs(output_dir, exist_ok=True)
-    # 保存数据
-    output_path = os.path.join(output_dir, df_name)
-    df.to_csv(output_path, index=False, encoding='utf-8')
-    print(f"\n数据已保存至: {output_path}")
-
 def drop_na_rows(df, column):
     """针对某列去除空值行，输出去除前和去除后的行数，以及去除数量"""
     rows_before = len(df)
@@ -192,6 +183,59 @@ def drop_na_rows(df, column):
     print(f"  去除后行数: {rows_after}")
     print(f"  去除数量: {rows_dropped}")
     return df_cleaned
+
+
+def courier_fatigue(df, idle_timeout_minutes=30, buffer_time=5):
+    """
+    计算骑手疲劳度：每单 dispatch_time 时，骑手当前连续在线时长（分钟）
+    逻辑：对每个骑手构建上线时间点序列，对于每单派单时间，找到最近一次上线时间，
+          dispatch_time - 最近上线时间 = 当前连续在线时长
+    """
+    df_result = df.copy()
+    df_result['fatigue'] = 0.0
+
+    idle_timeout = timedelta(minutes=idle_timeout_minutes)
+    buffer = timedelta(minutes=buffer_time)
+
+    df_result = df_result.sort_values(['courier_id', 'dispatch_time'])
+
+    for courier_id, group in df_result.groupby('courier_id'):
+        indices = group.index.tolist()
+        dts = group['dispatch_time'].values
+        ats = group['arrive_time'].values
+        n = len(group)
+
+        # 构建该骑手的所有上线时间点（有序）
+        online_times = [pd.Timestamp(dts[0]) - buffer]
+
+        for i in range(1, n):
+            cur_dispatch = pd.Timestamp(dts[i])
+            prev_arrives = [pd.Timestamp(ats[j]) for j in range(i)]
+            last_arrive = max(prev_arrives)
+
+            if cur_dispatch - last_arrive > idle_timeout:
+                online_times.append(cur_dispatch)
+
+        # 对每单，找到最近一次上线时间，计算连续在线时长
+        ptr = 0
+        for i in range(n):
+            dt = pd.Timestamp(dts[i])
+            while ptr + 1 < len(online_times) and online_times[ptr + 1] <= dt:
+                ptr += 1
+            online_so_far = (dt - online_times[ptr]).total_seconds() / 60
+            df_result.loc[indices[i], 'fatigue'] = online_so_far
+
+    return df_result
+    
+
+def save_csv(df, output_dir, df_name):
+    """保存数据"""
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    # 保存数据
+    output_path = os.path.join(output_dir, df_name)
+    df.to_csv(output_path, index=False, encoding='utf-8')
+    print(f"\n数据已保存至: {output_path}")
 
 
 def main():

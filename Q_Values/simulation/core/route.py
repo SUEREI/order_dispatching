@@ -117,6 +117,10 @@ class RoutePlanner:
                 'order_id': nearest_point['order_id'],
                 'position': nearest_point['position']
             }
+            if nearest_point['point_type'] == 'delivery':
+                order = orders_dict.get(nearest_point['order_id'])
+                if order:
+                    route_point['estimate_arrived_time'] = order.get('estimate_arrived_time')
             route.append(route_point)
             # 更新当前位置和序号
             current_pos = nearest_point['position']
