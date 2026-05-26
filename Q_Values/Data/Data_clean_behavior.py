@@ -2,6 +2,8 @@ import pandas as pd
 import os
 import numpy as np
 from datetime import datetime, timezone, timedelta
+from tqdm import tqdm
+
 # 设置pandas显示选项，显示所有列
 pd.set_option('display.max_columns', None)
 
@@ -199,22 +201,32 @@ def courier_fatigue(df, idle_timeout_minutes=30, buffer_time=5):
 
     df_result = df_result.sort_values(['courier_id', 'dispatch_time'])
 
-    for courier_id, group in df_result.groupby('courier_id'):
+    # 计算疲劳度
+    courier_ids = df_result['courier_id'].nunique()
+    for courier_id, group in tqdm(df_result.groupby('courier_id'),
+                                  total=courier_ids, desc='计算疲劳度'):
         indices = group.index.tolist()
         dts = group['dispatch_time'].values
         ats = group['arrive_time'].values
         n = len(group)
 
         # 构建该骑手的所有上线时间点（有序）
+        epoch = pd.Timestamp('1970-01-01 08:00:00')
         online_times = [pd.Timestamp(dts[0]) - buffer]
 
         for i in range(1, n):
             cur_dispatch = pd.Timestamp(dts[i])
-            prev_arrives = [pd.Timestamp(ats[j]) for j in range(i)]
+            prev_arrives = [pd.Timestamp(ats[j])
+                            if pd.Timestamp(ats[j]) != epoch
+                            else pd.Timestamp(dts[j])
+                            for j in range(i) ]
+            if not prev_arrives:
+                online_times.append(cur_dispatch - buffer)
+                continue
             last_arrive = max(prev_arrives)
 
             if cur_dispatch - last_arrive > idle_timeout:
-                online_times.append(cur_dispatch)
+                online_times.append(cur_dispatch - buffer)
 
         # 对每单，找到最近一次上线时间，计算连续在线时长
         ptr = 0
@@ -224,6 +236,8 @@ def courier_fatigue(df, idle_timeout_minutes=30, buffer_time=5):
                 ptr += 1
             online_so_far = (dt - online_times[ptr]).total_seconds() / 60
             df_result.loc[indices[i], 'fatigue'] = online_so_far
+
+    print(f'\n已完成疲劳度的计算')
 
     return df_result
     
@@ -242,6 +256,8 @@ def main():
     """主函数"""
     # 读取原始数据
     df = pd.read_csv(r'0MeiTuan_Data/all_waybill_info_meituan_0322.csv')
+    # 筛选出dt为特定值的行
+    # df = df[df['dt'] == 20221017]
 
     # 估计派单时骑手的位置
     df_extend = position_extend(df)
@@ -265,6 +281,9 @@ def main():
 
     # 计算派单时骑手正在处理的其他订单集合
     df_result = add_ongoing_set(df_cleaned)
+
+    # 计算骑手疲劳度
+    df_result = courier_fatigue(df_result)
 
     # 保存数据
     output_dir = r'Q_values/Data/Data_Processed'

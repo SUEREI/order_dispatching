@@ -168,7 +168,7 @@ def build_state_action_vector(
     dispatcher: OrderDispatcherByActorCritic,
 ) -> np.ndarray:
     """
-    为每条派单记录构建状态-动作合并向量 (27+5=32维)
+    为每条派单记录构建状态-动作合并向量 (27+5+4=36维)
 
     状态向量（27维, _build_state）：
       0-1:   骑手当前位置经度、纬度（归一化）
@@ -181,6 +181,12 @@ def build_state_action_vector(
       2-3:   新订单送餐点经度、纬度（归一化）
       4:     新订单可用配送时长（归一化 0~1）
 
+    附加特征（4维）：
+      27-28: 骑手在手订单数量（归一化 0~1, 除以10）
+      29:    骑手疲劳度（连续在线分钟数, 归一化 0~1, 除以480）
+      30:    是否周末（0/1）
+      31:    是否预约单（0/1）
+
     Args:
         df: 派单数据 DataFrame
         order_lookup: 订单查询字典 {waybill_id: detail}
@@ -188,11 +194,13 @@ def build_state_action_vector(
         dispatcher: Actor-Critic 分派器实例（提供 _build_state / _build_action）
 
     Returns:
-        np.ndarray, shape (n_rows, 32), 每行 = [state_27d | action_5d]
+        np.ndarray, shape (n_rows, 36), 每行 = [state_27d | action_5d | extra_4d]
     """
     n = len(df)
-    sa_dim = dispatcher.STATE_DIM + dispatcher.ACTION_DIM
-    sa_vectors = np.zeros((n, sa_dim), dtype=np.float32)
+    EXTRA_DIM = 4
+    base_dim = dispatcher.STATE_DIM + dispatcher.ACTION_DIM
+    total_dim = base_dim + EXTRA_DIM
+    sa_vectors = np.zeros((n, total_dim), dtype=np.float32)
 
     for idx, row in tqdm(df.iterrows(), total=n, desc='构建状态-动作向量'):
         dispatch_time = row['dispatch_time']
@@ -213,12 +221,25 @@ def build_state_action_vector(
         }
         action = dispatcher._build_action(order_action, dispatch_time)
 
+        # ===== 附加特征 (3维) =====
+        extra_feat = np.zeros(EXTRA_DIM, dtype=np.float32)
+
+        ongoing_set = parse_ongoing_set(row['ongoing_order_set'])
+        extra_feat[0] = len(ongoing_set) / 4.0
+
+        fatigue_val = row.get('fatigue', 0.0)
+        extra_feat[1] = (float(fatigue_val) / 120.0) if not pd.isna(fatigue_val) else 0.0
+
+        extra_feat[2] = float(row.get('is_weekend', 0))
+
+        extra_feat[3] = float(row.get('is_prebook', 0))
+
         # ===== 合并 =====
-        sa_vectors[idx] = np.concatenate([state, action])
+        sa_vectors[idx] = np.concatenate([state, action, extra_feat])
 
     logger.info(
-        f'状态-动作向量构建完成: {n} 条, 维度 {sa_dim} '
-        f'[{dispatcher.STATE_DIM}(state) + {dispatcher.ACTION_DIM}(action)]'
+        f'状态-动作向量构建完成: {n} 条, 维度 {total_dim} '
+        f'[{dispatcher.STATE_DIM}(state) + {dispatcher.ACTION_DIM}(action) + {EXTRA_DIM}(extra)]'
     )
     return sa_vectors
 
@@ -233,10 +254,10 @@ class GrabPredictionMLP(nn.Module):
     结构: MLP + ReLU + Dropout → Sigmoid 输出
     """
 
-    def __init__(self, feature_dim: int = 32, hidden_dims: List[int] = None, dropout: float = 0.3):
+    def __init__(self, feature_dim: int = 36, hidden_dims: List[int] = None, dropout: float = 0.3):
         super().__init__()
         if hidden_dims is None:
-            hidden_dims = [128, 64, 32]
+            hidden_dims = [256, 128, 64]
 
         layers = []
         input_dim = feature_dim
@@ -270,7 +291,7 @@ def prepare_classification_data(
     """准备 MLP 二分类训练/测试数据
 
     流程:
-    1. 调用 build_state_action_vector 构建 32 维特征矩阵 X
+    1. 调用 build_state_action_vector 构建 36 维特征矩阵 X
     2. 从 df 中提取 is_courier_grabbed 作为标签 y
     3. 按比例划分训练/测试集
     4. 封装为 PyTorch DataLoader
@@ -329,7 +350,7 @@ def train_grab_classifier(
     hidden_dims: List[int] = None,
     dropout: float = 0.3,
     lr: float = 1e-3,
-    epochs: int = 200,
+    epochs: int = 10,
     weight_decay: float = 1e-4,
     early_stop_patience: int = 15,
     pos_weight: float = None,
@@ -440,7 +461,7 @@ def train_grab_classifier(
         else:
             patience_counter += 1
 
-        if epoch == 1 or epoch % 20 == 0 or patience_counter == 0:
+        if epoch == 1 or epoch % 10 == 0 or patience_counter == 0:
             logger.info(
                 f'Epoch {epoch:3d}/{epochs} | '
                 f'Train Loss: {avg_train_loss:.4f} | '
@@ -544,14 +565,14 @@ def plot_training_history(history: Dict[str, List[float]], save_path: str = None
         axes[0].plot(epochs_range, history['val_loss'], label='Val Loss', alpha=0.7)
         axes[0].set_xlabel('Epoch')
         axes[0].set_ylabel('Loss')
-        axes[0].set_title('MLP 训练/验证损失')
+        axes[0].set_title('MLP Loss')
         axes[0].legend()
         axes[0].grid(True, alpha=0.3)
 
         axes[1].plot(epochs_range, history['val_auc'], label='Val AUC', color='green')
         axes[1].set_xlabel('Epoch')
         axes[1].set_ylabel('AUC')
-        axes[1].set_title('验证集 AUC')
+        axes[1].set_title('Val AUC')
         axes[1].legend()
         axes[1].grid(True, alpha=0.3)
 
@@ -598,12 +619,12 @@ def main():
     model, history = train_grab_classifier(
         train_loader, test_loader,
         feature_dim=feature_dim,
-        hidden_dims=[128, 64, 32],
+        hidden_dims=[256, 128, 64],
         dropout=0.3,
         lr=1e-3,
         epochs=10,
         weight_decay=1e-4,
-        early_stop_patience=15,
+        early_stop_patience=10,
         pos_weight=pos_weight,
     )
 
@@ -625,8 +646,6 @@ def main():
 
     plot_path = save_dir / 'training_history.png'
     plot_training_history(history, str(plot_path))
-
-    logger.info(df.head())
 
 
 if __name__ == '__main__':
