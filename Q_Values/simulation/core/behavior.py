@@ -181,11 +181,12 @@ def build_state_action_vector(
       2-3:   新订单送餐点经度、纬度（归一化）
       4:     新订单可用配送时长（归一化 0~1）
 
-    附加特征（4维）：
-      27-28: 骑手在手订单数量（归一化 0~1, 除以10）
-      29:    骑手疲劳度（连续在线分钟数, 归一化 0~1, 除以480）
-      30:    是否周末（0/1）
-      31:    是否预约单（0/1）
+    附加特征（5维）：
+      0:    骑手疲劳度（连续在线分钟数, 归一化 0~1, 除以480）
+      1:    是否周末（0/1）
+      2:    是否预约单（0/1）
+      3:    骑手日均拒单数（归一化 0~1, 除以10）
+      4:    商家日均拒单数（归一化 0~1, 除以10）
 
     Args:
         df: 派单数据 DataFrame
@@ -197,7 +198,7 @@ def build_state_action_vector(
         np.ndarray, shape (n_rows, 36), 每行 = [state_27d | action_5d | extra_4d]
     """
     n = len(df)
-    EXTRA_DIM = 4
+    EXTRA_DIM = 5
     base_dim = dispatcher.STATE_DIM + dispatcher.ACTION_DIM
     total_dim = base_dim + EXTRA_DIM
     sa_vectors = np.zeros((n, total_dim), dtype=np.float32)
@@ -221,18 +222,26 @@ def build_state_action_vector(
         }
         action = dispatcher._build_action(order_action, dispatch_time)
 
-        # ===== 附加特征 (3维) =====
+        # ===== 附加特征 (5维) =====
         extra_feat = np.zeros(EXTRA_DIM, dtype=np.float32)
 
-        ongoing_set = parse_ongoing_set(row['ongoing_order_set'])
-        extra_feat[0] = len(ongoing_set) / 4.0
+        # ongoing_set = parse_ongoing_set(row['ongoing_order_set'])
+        # extra_feat[0] = len(ongoing_set) / 4.0
 
         fatigue_val = row.get('fatigue', 0.0)
-        extra_feat[1] = (float(fatigue_val) / 120.0) if not pd.isna(fatigue_val) else 0.0
+        extra_feat[0] = (float(fatigue_val) / 120.0) if not pd.isna(fatigue_val) else 0.0
 
-        extra_feat[2] = float(row.get('is_weekend', 0))
+        extra_feat[1] = float(row.get('is_weekend', 0))
 
-        extra_feat[3] = float(row.get('is_prebook', 0))
+        extra_feat[2] = float(row.get('is_prebook', 0))
+
+        # extra_feat[3] = float(row.get('courier_id_daily_avg_rejected_count', 0) / 10.0)
+
+        # extra_feat[4] = float(row.get('poi_id_daily_avg_rejected_count', 0) / 20.0)
+
+        extra_feat[3] = float(row.get('courier_id_daily_avg_rejected_rate', 0))
+
+        extra_feat[4] = float(row.get('poi_id_daily_avg_rejected_rate', 0))
 
         # ===== 合并 =====
         sa_vectors[idx] = np.concatenate([state, action, extra_feat])
@@ -350,7 +359,7 @@ def train_grab_classifier(
     hidden_dims: List[int] = None,
     dropout: float = 0.3,
     lr: float = 1e-3,
-    epochs: int = 10,
+    epochs: int = 200,
     weight_decay: float = 1e-4,
     early_stop_patience: int = 15,
     pos_weight: float = None,
@@ -613,7 +622,8 @@ def main():
 
     n_pos = int(y.sum())
     n_neg = len(y) - n_pos
-    pos_weight = n_neg / n_pos if n_pos > 0 else 1.0
+    # pos_weight = n_neg / n_pos if n_pos > 0 else 1.0
+    pos_weight = 0.5
     logger.info(f'正类权重 pos_weight={pos_weight:.4f}（负样本 {n_neg} / 正样本 {n_pos}）')
 
     model, history = train_grab_classifier(
@@ -622,7 +632,7 @@ def main():
         hidden_dims=[256, 128, 64],
         dropout=0.3,
         lr=1e-3,
-        epochs=10,
+        epochs=200,
         weight_decay=1e-4,
         early_stop_patience=10,
         pos_weight=pos_weight,

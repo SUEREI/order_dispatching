@@ -125,6 +125,9 @@ class StateRefresher:
             'courier_updates': None,
             'order_updates': []
         }
+        courier['fatigue'] += 0.5
+        logger.debug(f"骑手 {courier['courier_id']} 疲劳度 {courier['fatigue']:.2f}")
+
 
         # 处理特殊状态
         special_status_result = self.handle_special_status(courier, current_time)

@@ -37,8 +37,12 @@ class OrderGenerator:
                     'recipient_lng': row['recipient_lng'] / 10**6,
                     'recipient_lat': row['recipient_lat'] / 10**6,
                     'dispatch_time': time_key,
+                    'grab_time': time_key,
                     'estimate_meal_prepare_time': row['estimate_meal_prepare_time'],
                     'estimate_arrived_time': row['estimate_arrived_time'],
+                    'poi_id_daily_avg_rejected_rate': row['poi_id_daily_avg_rejected_rate'],
+                    'is_prebook': row['is_prebook'],
+                    'is_weekend': row['is_weekend'],
                     'status': 'pending',
                     'courier_id': None,
                     # pd.to_datetime('2099-12-31 23:59:59')

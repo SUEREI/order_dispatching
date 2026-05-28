@@ -350,6 +350,36 @@ def count_ongoing_orders(df):
     return df_result
 
 
+def max_ongoing_distance(df):
+    """
+    计算 ongoing_order_set 中所有订单的 sender_to_recipient_delivery_distance 的最大值
+    结果存入新列 max_ongoing_sender_to_recipient_distance
+    """
+    df_result = df.copy()
+
+    if 'ongoing_order_set' not in df_result.columns:
+        print('警告: 数据中不存在 ongoing_order_set 列')
+        df_result['max_ongoing_sender_to_recipient_distance'] = 0.0
+        return df_result
+
+    df_result['ongoing_order_set'] = df_result['ongoing_order_set'].apply(parse_set_string)
+
+    distance_map = df_result.set_index('waybill_id')['sender_to_recipient_delivery_distance'].to_dict()
+
+    def max_distance(waybill_set):
+        if not waybill_set:
+            return 0.0
+        distances = [distance_map.get(wid, 0.0) for wid in waybill_set]
+        return max(distances) if distances else 0.0
+
+    df_result['max_ongoing_sender_to_recipient_distance'] = (
+        df_result['ongoing_order_set'].apply(max_distance)
+    )
+
+    print(f'\n已完成在手订单最大配送距离的计算')
+    return df_result
+
+
 def save_csv(df, output_dir, df_name):
     """保存数据"""
     # 确保输出目录存在
@@ -365,7 +395,8 @@ def main():
     df = pd.read_csv(r'Behavior/Data/Data_Processed/cleaned_waybill_info.csv')
     
     # 扩展位置信息
-    # df = position_extend(df)
+    if 'dispatch_lat' not in df.columns or 'dispatch_lng' not in df.columns:
+        df = position_extend(df)
 
     # 转换时间格式
     time_columns = [
@@ -378,35 +409,41 @@ def main():
         'order_push_time',
         'platform_order_time'
     ]
-    # df_cleaned = time_convert(df_extend, time_columns)
     df = time_convert(df, time_columns)
 
-    # df_cleaned = drop_na_rows(df_cleaned, 'dispatch_lat')
+    # 删除包含缺失值的行
+    df = drop_na_rows(df, 'dispatch_lat')
 
     # 计算派单时骑手正在处理的其他订单集合
-    # df_result = add_ongoing_set(df_cleaned)
+    if 'ongoing_order_set' not in df.columns:
+        df = add_ongoing_set(df)
 
     # 计算骑手疲劳度
-    # df_result = courier_fatigue(df_result)
-
-    # 计算新订单的配送距离
-    
-    # df_result = delivery_distance(df_result)
+    if 'courier_fatigue' not in df.columns:
+        df = courier_fatigue(df)
 
     # 计算距离
-    # df_result = delivery_distance(df, 'dispatch', 'sender')
-    # df_result = delivery_distance(df_result, 'sender', 'recipient')
+    if 'sender_to_recipient_delivery_distance' not in df.columns:
+        df = delivery_distance(df, 'dispatch', 'sender')
+    if 'recipient_to_sender_delivery_distance' not in df.columns:
+        df = delivery_distance(df, 'sender', 'recipient')
 
     # 过滤配送速度
-    # df_result = filter_by_speed(df_result, speed_threshold=30)
+    if 'delivery_speed' not in df.columns:
+        df = filter_by_speed(df, speed_threshold=30)
 
     # 计算ongoing_order_set集合中的元素个数
-    df_result = count_ongoing_orders(df)
-    print(df_result.head())
+    if 'ongoing_order_count' not in df.columns:
+        df = count_ongoing_orders(df)
+
+    # 计算在手订单最大配送距离
+    if 'max_ongoing_sender_to_recipient_distance' not in df.columns:
+        df = max_ongoing_distance(df)
+    print(df.head())
     
     # 保存数据
     output_dir = r'Behavior/Data/Data_Processed'
-    save_csv(df_result, output_dir, 'cleaned_waybill_info.csv')
+    save_csv(df, output_dir, 'cleaned_waybill_info.csv')
 
 
 

@@ -242,6 +242,64 @@ def courier_fatigue(df, idle_timeout_minutes=30, buffer_time=5):
     return df_result
     
 
+def daily_avg_rejection(df, group_col, dt_col='dt', target_col='is_courier_grabbed'):
+    """
+    计算不同实体（骑手/商家）的日均拒单数量和日均拒单率，合并到原表
+
+    拒单定义: target_col == 0（骑手未抢单，即系统派单）
+
+    Parameters
+    ----------
+    df : DataFrame
+        输入数据，需包含 group_col、dt_col、target_col 三列
+    group_col : str
+        分组列名，如 'courier_id'（骑手）或 'poi_id'（商家）
+    dt_col : str
+        日期列名，默认 'dt'
+    target_col : str
+        目标列名（是否抢单），默认 'is_courier_grabbed'
+
+    Returns
+    -------
+    DataFrame
+        原表基础上新增两列:
+        {group_col}_daily_avg_rejected_count
+        {group_col}_daily_avg_rejected_rate
+    """
+    df_result = df.copy()
+
+    daily_stats = (
+        df_result.groupby([group_col, dt_col])
+        .agg(
+            total_orders=(target_col, 'count'),
+            rejected_orders=(target_col, lambda x: (x == 0).sum()),
+        )
+        .reset_index()
+    )
+
+    summary = (
+        daily_stats.groupby(group_col)
+        .agg(
+            total_orders=('total_orders', 'sum'),
+            rejected_orders=('rejected_orders', 'sum'),
+            active_days=(dt_col, 'nunique'),
+        )
+        .reset_index()
+    )
+
+    summary[f'{group_col}_daily_avg_rejected_count'] = summary['rejected_orders'] / summary['active_days']
+    summary[f'{group_col}_daily_avg_rejected_rate'] = summary['rejected_orders'] / summary['total_orders']
+
+    df_result = df_result.merge(
+        summary[[group_col, f'{group_col}_daily_avg_rejected_count', f'{group_col}_daily_avg_rejected_rate']],
+        on=group_col,
+        how='left'
+    )
+
+    print(f'\n[{group_col}] 日均拒单统计已合并到原表')
+    return df_result
+
+
 def save_csv(df, output_dir, df_name):
     """保存数据"""
     # 确保输出目录存在
@@ -255,12 +313,14 @@ def save_csv(df, output_dir, df_name):
 def main():
     """主函数"""
     # 读取原始数据
-    df = pd.read_csv(r'0MeiTuan_Data/all_waybill_info_meituan_0322.csv')
+    # df = pd.read_csv(r'0MeiTuan_Data/all_waybill_info_meituan_0322.csv')
+    df = pd.read_csv(r'Q_Values/Data/Data_Processed/cleaned_waybill_info_behavior.csv')
     # 筛选出dt为特定值的行
     # df = df[df['dt'] == 20221017]
 
     # 估计派单时骑手的位置
-    df_extend = position_extend(df)
+    if 'dispatch_lng' not in df.columns or 'dispatch_lat' not in df.columns:
+        df = position_extend(df)
 
     # 转换时间格式
     time_columns = [
@@ -273,21 +333,31 @@ def main():
         'order_push_time',
         'platform_order_time'
     ]
-    df_cleaned = time_convert(df_extend, time_columns)
+    # df = time_convert(df, time_columns)
 
     # 去除空值行
-    df_cleaned = drop_na_rows(df_cleaned, 'dispatch_lng')
-    df_cleaned = drop_na_rows(df_cleaned, 'dispatch_lat')
+    # df = drop_na_rows(df, 'dispatch_lng')
+    # df = drop_na_rows(df, 'dispatch_lat')
 
     # 计算派单时骑手正在处理的其他订单集合
-    df_result = add_ongoing_set(df_cleaned)
+    if 'ongoing_order_set' not in df.columns:
+        df = add_ongoing_set(df)
 
     # 计算骑手疲劳度
-    df_result = courier_fatigue(df_result)
+    if 'fatigue' not in df.columns:
+        df = courier_fatigue(df)
 
+    # 计算骑手日均拒单数量和日均拒单率
+    if 'courier_daily_avg_rejected_count' not in df.columns or 'courier_daily_avg_rejected_rate' not in df.columns:
+        df = daily_avg_rejection(df, group_col='courier_id')
+
+    # 计算商家日均拒单数量和日均拒单率
+    if 'poi_daily_avg_rejected_count' not in df.columns or 'poi_daily_avg_rejected_rate' not in df.columns:
+        df = daily_avg_rejection(df, group_col='poi_id')
+    
     # 保存数据
-    output_dir = r'Q_values/Data/Data_Processed'
-    save_csv(df_result, output_dir, 'cleaned_waybill_info_behavior.csv')
+    output_dir = r'Q_Values/Data/Data_Processed'
+    save_csv(df, output_dir, 'cleaned_waybill_info_behavior.csv')
 
 
 

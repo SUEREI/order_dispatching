@@ -13,17 +13,18 @@
 """
 
 import copy
+import joblib
 import logging
 import random
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
-
 from dqn.dqn_network import ActorCriticAgent, ActorCriticConfig
 from core.route import RoutePlanner
-from utils import haversine_distance
+from utils import haversine_distance, haversine_distance_vectorized
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class OrderDispatcherByActorCritic:
 
     STATE_DIM = 27
     ACTION_DIM = 5
+    EXTRA_DIM = 5
 
     MAX_ROUTE_POINTS = 8
     ROUTE_POINT_DIM = 16
@@ -47,13 +49,45 @@ class OrderDispatcherByActorCritic:
 
     COURIER_SPEED = 30.0
 
-    def __init__(self, route_planner: RoutePlanner, config: ActorCriticConfig = None):
-        """初始化 Actor-Critic 分派器"""
+    DT_FEATURE_NAMES = [
+        'fatigue',
+        'dispatch_to_sender_delivery_distance',
+        'sender_to_recipient_delivery_distance',
+        'ongoing_order_count',
+        'max_ongoing_sender_to_recipient_distance',
+    ]
+
+    def __init__(
+        self,
+        route_planner: RoutePlanner,
+        config: ActorCriticConfig = None,
+        grab_prediction: bool = True,
+        candidate_selection: str = 'distance',
+    ):
+        """初始化 Actor-Critic 分派器
+
+        Args:
+            route_planner: 路径规划器
+            config: 超参数配置
+            candidate_selection: 候选骑手筛选方式
+                - 'distance': 按距离排序（默认）
+                - 'decision_tree': 按决策树预测接单概率排序
+        """
         self.route_planner = route_planner
         self.config = config or ActorCriticConfig()
         self.ac_agent = ActorCriticAgent(self.STATE_DIM, self.ACTION_DIM, self.config)
+        self.candidate_selection = candidate_selection
+        self.grab_prediction = grab_prediction
+        
+        if candidate_selection == 'decision_tree':
+            model_path = (
+                Path(__file__).resolve().parent.parent.parent.parent
+                / 'SPOT' / 'core' / 'pkl_s' / 'decision_tree_model.pkl'
+            )
+            self.dt_model = joblib.load(model_path)
+            logger.info(f"决策树模型已加载: {model_path}")
 
-        logger.info("Actor-Critic 订单分派器初始化完成")
+        logger.info(f"Actor-Critic 订单分派器初始化完成，候选筛选方式: {candidate_selection}")
 
     def dispatch_orders(
         self,
@@ -100,6 +134,17 @@ class OrderDispatcherByActorCritic:
                 chosen_id = candidate_ids[chosen_index]
                 chosen_courier = candidate_couriers[chosen_index]
 
+                state_ = courier_states[chosen_index]
+                extra_feat = self._build_extra(order, chosen_courier)
+                behavior_vector = np.concatenate([state_, order_action, extra_feat])
+                grab_prob = self.predict_grab_probability(behavior_vector)
+                logger.debug(f"订单 {order['order_id']} 预测接单概率: {grab_prob:.4f}")
+                if self.grab_prediction and random.random() > grab_prob:
+                    # if random.random() < 1 - grab_prob:
+                    logger.debug(f"订单 {order['order_id']} 骑手 {chosen_id} 接单，概率: {grab_prob:.4f}")
+                    dispatch_results[order['order_id']] = chosen_id+'_reject'
+                    continue
+
                 dispatch_results[order['order_id']] = chosen_id
 
                 if is_training:
@@ -139,26 +184,66 @@ class OrderDispatcherByActorCritic:
         couriers: Dict[str, Dict]
     ) -> List[Tuple[str, Dict]]:
         """筛选候选骑手"""
-        order_pos = (order['sender_lng'], order['sender_lat'])
         max_orders = self.config.max_orders_per_courier
         candidate_count = self.config.candidate_count
 
-        courier_distances = []
+        courier_candidates = []
         for cid, courier in couriers.items():
             if courier.get('status') != 'online':
                 continue
             if courier.get('position') is None:
                 continue
-
             current_count = len(courier.get('current_orders', []))
             if current_count >= max_orders:
                 continue
+            courier_candidates.append((cid, courier))
 
-            distance = haversine_distance(order_pos, courier['position'])
-            courier_distances.append((cid, courier, distance))
+        if not courier_candidates:
+            return []
 
+        if self.candidate_selection == 'decision_tree':
+            return self._select_candidates_by_dt(order, courier_candidates, candidate_count)
+        return self._select_candidates_by_distance(order, courier_candidates, candidate_count)
+
+    def _select_candidates_by_distance(
+        self,
+        order: Dict,
+        courier_candidates: List[Tuple[str, Dict]],
+        candidate_count: int,
+    ) -> List[Tuple[str, Dict]]:
+        """按距离排序筛选候选骑手"""
+        order_pos = (order['sender_lng'], order['sender_lat'])
+        courier_positions = [c['position'] for _, c in courier_candidates]
+
+        distances = haversine_distance_vectorized(order_pos, np.array(courier_positions))
+        courier_distances = [
+            (cid, courier, dist)
+            for (cid, courier), dist in zip(courier_candidates, distances)
+        ]
         courier_distances.sort(key=lambda x: x[2])
         candidates = [(cid, c) for cid, c, _ in courier_distances[:candidate_count]]
+
+        return candidates
+
+    def _select_candidates_by_dt(
+        self,
+        order: Dict,
+        courier_candidates: List[Tuple[str, Dict]],
+        candidate_count: int,
+    ) -> List[Tuple[str, Dict]]:
+        """按决策树预测接单概率排序筛选候选骑手"""
+        features_list = np.array([
+            self._build_dt_features(order, courier)
+            for _, courier in courier_candidates
+        ])
+        features_df = pd.DataFrame(features_list, columns=self.DT_FEATURE_NAMES)
+        probs = self.dt_model.predict_proba(features_df)[:, 1]
+        courier_probabilities = [
+            (cid, courier, prob)
+            for (cid, courier), prob in zip(courier_candidates, probs)
+        ]
+        courier_probabilities.sort(key=lambda x: x[2], reverse=True)
+        candidates = [(cid, c) for cid, c, _ in courier_probabilities[:candidate_count]]
 
         return candidates
 
@@ -224,6 +309,87 @@ class OrderDispatcherByActorCritic:
         action[4] = available_time / self.config.max_delivery_time
 
         return action
+
+
+    def _build_extra(self, order: Dict, courier: Dict) -> np.ndarray:
+        """构建额外特征向量"""
+        extra = np.zeros(self.EXTRA_DIM, dtype=np.float32)
+
+        extra[0] = float(courier.get('fatigue', 0.0)) / 120.0
+        extra[1] = float(order.get('is_weekend', 0))
+        extra[2] = float(order.get('is_prebook', 0))
+        extra[3] = float(courier.get('rejected_rate', 0))
+        extra[4] = float(order.get('poi_id_daily_avg_rejected_rate', 0))
+
+        return extra
+
+    def _build_dt_features(self, order: Dict, courier: Dict) -> np.ndarray:
+        features = np.zeros(5, dtype=np.float32)
+
+        features[0] = float(courier.get('fatigue', 0.0))
+
+        courier_pos = courier.get('position')
+        if courier_pos is not None:
+            order_sender = (order['sender_lng'], order['sender_lat'])
+            features[1] = haversine_distance(courier_pos, order_sender)
+
+        order_recipient = (order['recipient_lng'], order['recipient_lat'])
+        order_sender = (order['sender_lng'], order['sender_lat'])
+        features[2] = haversine_distance(order_sender, order_recipient)
+
+        features[3] = float(len(courier.get('current_orders', [])))
+
+        max_dist = 0.0
+        for o in courier.get('current_orders', []):
+            o_sender = (o['sender_lng'], o['sender_lat'])
+            o_recipient = (o['recipient_lng'], o['recipient_lat'])
+            d = haversine_distance(o_sender, o_recipient)
+            if d > max_dist:
+                max_dist = d
+        features[4] = max_dist
+
+        return features
+
+    def predict_grab_probability(self, behavior_vector: np.ndarray) -> float:
+        """基于 GrabPredictionMLP 预测骑手接单概率
+
+        加载预训练的 GrabPredictionMLP 模型（训练于 behavior.py），
+        对传入的 37 维行为向量 [state_27 | action_5 | extra_5] 进行推理。
+
+        Args:
+            behavior_vector: 37 维行为向量
+
+        Returns:
+            grab_prob: 骑手接单概率 (0~1)
+        """
+        import torch
+        from pathlib import Path
+        from core.behavior import GrabPredictionMLP
+
+        # 自动判断是否有 GPU
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        if not hasattr(self, '_grab_model'):
+            model_path = (
+                Path(__file__).resolve().parent.parent
+                / 'behavior' / 'grab_prediction_mlp_0_3.pth'
+            )
+            self._grab_model = GrabPredictionMLP(feature_dim=len(behavior_vector))
+            
+            # 加载模型 + 移到 GPU
+            self._grab_model.load_state_dict(
+                torch.load(model_path)
+            )
+            self._grab_model.to(self.device)  # 模型放 GPU
+            self._grab_model.eval()
+
+        # 数据也放 GPU
+        x = torch.FloatTensor(behavior_vector).unsqueeze(0).to(self.device)
+        
+        with torch.no_grad():
+            grab_prob = self._grab_model.predict_proba(x).item()
+
+        return grab_prob
 
     def _calculate_available_time(self, order: Dict, current_time: datetime) -> float:
         """计算新订单的可用配送时长"""

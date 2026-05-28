@@ -13,6 +13,69 @@ df = pd.read_csv(input_path)
 print(f"原始数据形状: {df.shape}")
 print(f"原始数据记录数: {len(df)}")
 
+
+def daily_avg_rejection(df, group_col, dt_col='dt', target_col='is_courier_grabbed'):
+    """
+    计算不同实体（骑手/商家）的日均拒单数量和日均拒单率，合并到原表
+
+    拒单定义: target_col == 0（骑手未抢单，即系统派单）
+
+    Parameters
+    ----------
+    df : DataFrame
+        输入数据，需包含 group_col、dt_col、target_col 三列
+    group_col : str
+        分组列名，如 'courier_id'（骑手）或 'poi_id'（商家）
+    dt_col : str
+        日期列名，默认 'dt'
+    target_col : str
+        目标列名（是否抢单），默认 'is_courier_grabbed'
+
+    Returns
+    -------
+    DataFrame
+        原表基础上新增两列:
+        {group_col}_daily_avg_rejected_count
+        {group_col}_daily_avg_rejected_rate
+    """
+    df_result = df.copy()
+
+    daily_stats = (
+        df_result.groupby([group_col, dt_col])
+        .agg(
+            total_orders=(target_col, 'count'),
+            rejected_orders=(target_col, lambda x: (x == 0).sum()),
+        )
+        .reset_index()
+    )
+
+    summary = (
+        daily_stats.groupby(group_col)
+        .agg(
+            total_orders=('total_orders', 'sum'),
+            rejected_orders=('rejected_orders', 'sum'),
+            active_days=(dt_col, 'nunique'),
+        )
+        .reset_index()
+    )
+
+    summary[f'{group_col}_daily_avg_rejected_count'] = summary['rejected_orders'] / summary['active_days']
+    summary[f'{group_col}_daily_avg_rejected_rate'] = summary['rejected_orders'] / summary['total_orders']
+
+    df_result = df_result.merge(
+        summary[[group_col, f'{group_col}_daily_avg_rejected_count', f'{group_col}_daily_avg_rejected_rate']],
+        on=group_col,
+        how='left'
+    )
+
+    print(f'\n[{group_col}] 日均拒单统计已合并到原表')
+    return df_result
+
+
+# 计算日均拒单统计
+df = daily_avg_rejection(df, 'courier_id')
+df = daily_avg_rejection(df, 'poi_id')
+
 # 1. 去除is_courier_grabbed为0的字段
 print("\n正在进行数据清洗...")
 before_count = len(df)
@@ -87,6 +150,7 @@ def round_dispatch_time(dt):
     else:
         # 向后推到下一分钟的00s
         return (dt + timedelta(minutes=1)).replace(second=0, microsecond=0)
+
 
 # 处理dispatch_time字段，应用round_dispatch_time函数
 print("\n正在处理dispatch_time,arrive_time字段...")

@@ -4,6 +4,7 @@
 仿真主程序
 """
 
+import copy
 import logging
 import os
 from datetime import timedelta
@@ -100,6 +101,8 @@ class DeliverySimulation:
                 'courier_id': cid,
                 'status': 'offline',
                 'position': None,
+                'rejected_rate': None,
+                'fatigue': None,
                 'order_increased': False,
                 'current_orders': [],
                 'route': [],
@@ -138,10 +141,12 @@ class DeliverySimulation:
                 
         # 2. 处理当前时间点的骑手上下线事件
         courier_events = self.courier_sim.get_events_at_time(self.current_time)
-        for cid, etype, pos in courier_events:
+        for cid, etype, pos, rejected_rate in courier_events:
             self.couriers[cid]['status'] = etype
             if etype == 'online':
                 self.couriers[cid]['position'] = pos
+                self.couriers[cid]['rejected_rate'] = rejected_rate
+                self.couriers[cid]['fatigue'] = 0
                 self.couriers[cid]['has_had_orders'] = False
         online_couriers = {cid: info for cid, info in self.couriers.items() if info['status'] == 'online'}
         # logger.info(f"当前时间点 {self.current_time} 的在线骑手数量: {len(online_couriers)}")
@@ -162,8 +167,16 @@ class DeliverySimulation:
             for order in self.pending_orders:
                 if order['order_id'] in dispatch_results:
                     courier_id = dispatch_results[order['order_id']]
+                    if courier_id.endswith('_reject'):
+                        rejected_order = copy.deepcopy(self.orders[order['order_id']])
+                        rejected_order['status'] = 'rejected'
+                        rejected_order['courier_id'] = courier_id.split('_')[0]
+                        rejected_order['grab_time'] = pd.Timestamp('1970-01-01')
+                        self.orders[order['order_id']+'_'+str(current_time)] = rejected_order
+                        continue
                     self.couriers[courier_id]['has_had_orders'] = True
                     self.orders[order['order_id']]['courier_id'] = courier_id
+                    self.orders[order['order_id']]['grab_time'] = current_time
                     dispatched_orders.append(order)
             # 从待分配订单池中移除已分派的订单
             for order in dispatched_orders:
@@ -246,9 +259,14 @@ def _compute_delivery_metrics(orders_df):
     timeout_mask = delivered['actual_delivery_time'] > delivered['estimate_arrived_time']
     timeout_orders = delivered[timeout_mask]
 
+    rejected_count = int(orders_df['status'].eq('rejected').sum()) if 'status' in orders_df.columns else 0
+    rejection_rate = rejected_count / len(orders_df) if len(orders_df) > 0 else 0.0
+
     return {
         'total': len(orders_df),
         'delivered_count': len(delivered),
+        'rejected_count': rejected_count,
+        'rejection_rate': rejection_rate,
         'timeout_count': len(timeout_orders),
         'avg_delivery_duration': delivered['delivery_duration'].mean(),
         'overtime_rate': len(timeout_orders) / len(delivered),
@@ -308,12 +326,14 @@ def _log_step_info(sim, step, current_time):
 
 
 def _log_period_summary(period, metrics):
-    """记录每3小时周期结束时的指标汇总"""
+    """记录周期结束时的指标汇总"""
     if metrics is None:
         return
     logger.info(
         f"===== 第 {period} 个周期结束，训练前指标 =====\n"
         f"已送达订单数: {metrics['delivered_count']}\n"
+        f"拒单数: {metrics['rejected_count']}\n"
+        f"拒单率: {metrics['rejection_rate']:.2%}\n"
         f"平均配送时长: {metrics['avg_delivery_duration']:.2f}分钟\n"
         f"超时率: {metrics['overtime_rate']:.2%}\n"
         f"平均超时时长: {metrics['avg_overtime']:.2f}分钟\n"
@@ -329,6 +349,8 @@ def _log_final_summary(metrics):
     logger.info(
         f"总订单数: {metrics['total']}\n"
         f"已送达订单数: {metrics['delivered_count']}\n"
+        f"拒单数: {metrics['rejected_count']}\n"
+        f"拒单率: {metrics['rejection_rate']:.2%}\n"
         f"平均配送时长: {metrics['avg_delivery_duration']:.2f}分钟\n"
         f"超时订单数: {metrics['timeout_count']}\n"
         f"超时率: {metrics['overtime_rate']:.2%}\n"
@@ -495,9 +517,10 @@ def main():
     if not sim.is_train:
         result_dir = r'Q_Values\simulation\simulation_result'
         os.makedirs(result_dir, exist_ok=True)
-        result_path = os.path.join(result_dir, 'dqn_dispatch.csv')
+        result_path = os.path.join(result_dir, f'dqn_dispatch_{DATE_FILTER[0]}.csv')
 
         orders_df = all_orders_df.copy()
+        orders_df['order_id'] = orders_df['order_id'].astype(str).str.split('_').str[0]
         orders_df['overtime_minutes'] = (
             orders_df['actual_delivery_time'] - orders_df['estimate_arrived_time']
         ).dt.total_seconds() / 60

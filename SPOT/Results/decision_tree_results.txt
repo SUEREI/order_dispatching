@@ -1,0 +1,39 @@
+============================================================
+Decision Tree Classification - Predict is_courier_grabbed
+============================================================
+Number of features: 5
+Tree depth: 4
+Number of leaves: 12
+Continuous features: ['fatigue', 'dispatch_to_sender_delivery_distance', 'sender_to_recipient_delivery_distance', 'ongoing_order_count', 'max_ongoing_sender_to_recipient_distance']
+Binary features: []
+
+[Train Set Evaluation]
+  Accuracy:  0.6531
+  Precision: 0.9085
+  Recall:    0.6686
+  Specificity:0.5493
+  F1 Score:  0.7703
+  ROC-AUC:   0.6455
+  Confusion Matrix:
+    TN= 37288  FP= 30590
+    FN=150472  TP=303628
+
+[Test Set Evaluation]
+  Accuracy:  0.6525
+  Precision: 0.9096
+  Recall:    0.6677
+  Specificity:0.5494
+  F1 Score:  0.7701
+  ROC-AUC:   0.6425
+  Confusion Matrix:
+    TN=  9202  FP=  7546
+    FN= 37797  TP= 75950
+
+[Feature Importance]
+Feature                                            Importance
+--------------------------------------------------------------
+dispatch_to_sender_delivery_distance                   0.3543
+ongoing_order_count                                    0.2869
+fatigue                                                0.2219
+max_ongoing_sender_to_recipient_distance               0.0722
+sender_to_recipient_delivery_distance                  0.0648

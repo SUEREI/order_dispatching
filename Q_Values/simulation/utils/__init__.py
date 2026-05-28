@@ -5,6 +5,7 @@
 该模块包含路径规划与状态刷新系统所需的工具类和函数。
 """
 
-from utils.geo_utils import haversine_distance, calculate_move_position
+from utils.geo_utils import haversine_distance, haversine_distance_vectorized, calculate_move_position
 
-__all__ = ['haversine_distance', 'calculate_move_position']
+__all__ = ['haversine_distance_vectorized', 'calculate_move_position',
+           'haversine_distance', 'calculate_move_position']

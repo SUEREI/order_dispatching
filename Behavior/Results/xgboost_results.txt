@@ -1,0 +1,52 @@
+============================================================
+XGBoost - 二分类预测结果
+============================================================
+特征数量: 7
+最佳迭代轮数: 199
+连续特征: ['fatigue', 'dispatch_to_sender_delivery_distance', 'sender_to_recipient_delivery_distance', 'ongoing_order_count', 'max_ongoing_sender_to_recipient_distance']
+二值特征: ['is_prebook', 'is_weekend']
+
+[训练集评估]
+  Accuracy: 0.6597
+  True positive rate: 0.6592
+  True negative rate: 0.6636
+  F1 score: 0.7713
+
+[测试集评估]
+  Accuracy: 0.6509
+  True positive rate: 0.6532
+  True negative rate: 0.6357
+  F1 score: 0.7651
+  ROC-AUC: 0.7055
+
+[混淆矩阵 (测试集)]
+         预测 0    预测 1
+实际 0     8069     4625
+实际 1    29543    55634
+
+  真负(TN): 8069 (8.2%)
+  假正(FP): 4625 (4.7%)
+  假负(FN): 29543 (30.2%)
+  真正(TP): 55634 (56.8%)
+
+[特征重要性 (按 gain 排序)]
+特征                                                  重要性(gain)
+--------------------------------------------------------------
+ongoing_order_count                                    0.2468
+is_prebook                                             0.1796
+dispatch_to_sender_delivery_distance                   0.1717
+fatigue                                                0.1552
+max_ongoing_sender_to_recipient_distance               0.1029
+sender_to_recipient_delivery_distance                  0.1027
+is_weekend                                             0.0410
+
+[特征重要性 (按 weight 排序)]
+特征                                                重要性(weight)
+--------------------------------------------------------------
+sender_to_recipient_delivery_distance                    2609
+fatigue                                                  2340
+dispatch_to_sender_delivery_distance                     2335
+max_ongoing_sender_to_recipient_distance                 2119
+ongoing_order_count                                       845
+is_weekend                                                368
+is_prebook                                                197

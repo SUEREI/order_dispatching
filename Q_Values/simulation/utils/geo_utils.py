@@ -8,7 +8,9 @@
 """
 
 import math
-from typing import Tuple
+from typing import Tuple, List, Union
+
+import numpy as np
 
 # 地球半径（米）
 EARTH_RADIUS = 6371000
@@ -37,6 +39,44 @@ def haversine_distance(coord1: Tuple[float, float], coord2: Tuple[float, float])
     distance = EARTH_RADIUS * c * ROAD_FACTOR
 
     return distance
+
+
+def haversine_distance_vectorized(
+    coord1: Tuple[float, float],
+    coord2_list: Union[List[Tuple[float, float]], np.ndarray],
+) -> np.ndarray:
+    """
+    向量化Haversine距离计算：一个点与一组点之间的距离
+
+    Parameters
+    ----------
+    coord1 : Tuple[float, float]
+        单个位置 (lng, lat)
+    coord2_list : List[Tuple[float, float]] | np.ndarray
+        一组位置，shape=(N,2)，每行为 (lng, lat)
+
+    Returns
+    -------
+    np.ndarray
+        shape=(N,)，每个元素为 coord1 到对应点的距离（米），含路网系数
+    """
+    coord2_arr = np.asarray(coord2_list)
+
+    if coord2_arr.ndim == 0 or coord2_arr.shape[0] == 0:
+        return np.array([], dtype=float)
+
+    lng1, lat1 = coord1
+    lng1_rad, lat1_rad = np.radians(lng1), np.radians(lat1)
+    lng2_rad = np.radians(coord2_arr[:, 0])
+    lat2_rad = np.radians(coord2_arr[:, 1])
+
+    dlon = lng2_rad - lng1_rad
+    dlat = lat2_rad - lat1_rad
+
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+
+    return EARTH_RADIUS * c * ROAD_FACTOR
 
 
 def calculate_move_position(
