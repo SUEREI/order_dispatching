@@ -3,6 +3,8 @@ import numpy as np
 import os
 import sys
 from pathlib import Path
+
+from torch import batch_norm
 sys.path.append(str(Path(__file__).parent.parent))
 
 from sklearn.model_selection import train_test_split
@@ -29,6 +31,8 @@ def prepare_features_target(df):
         'sender_to_recipient_delivery_distance',
         'ongoing_order_count',
         'max_ongoing_sender_to_recipient_distance',
+        'courier_id_daily_avg_rejected_rate',
+        'poi_id_daily_avg_rejected_rate',
     ]
     binary_features = [
         # 'is_prebook',
@@ -49,12 +53,12 @@ def prepare_features_target(df):
 
 def train_decision_tree(X_train, y_train, X_val, y_val):
     model = DecisionTreeClassifier(
-        max_depth=4,
+        # max_depth=4,
         min_samples_split=20,
         min_samples_leaf=10,
         random_state=42,
         ccp_alpha=0.001,
-        class_weight='balanced',
+        class_weight={0: 1.0, 1: 0.3},
     )
     model.fit(X_train, y_train)
     return model

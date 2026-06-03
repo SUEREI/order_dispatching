@@ -380,6 +380,64 @@ def max_ongoing_distance(df):
     return df_result
 
 
+def daily_avg_rejection(df, group_col, dt_col='dt', target_col='is_courier_grabbed'):
+    """
+    计算不同实体（骑手/商家）的日均拒单数量和日均拒单率，合并到原表
+
+    拒单定义: target_col == 0（骑手未抢单，即系统派单）
+
+    Parameters
+    ----------
+    df : DataFrame
+        输入数据，需包含 group_col、dt_col、target_col 三列
+    group_col : str
+        分组列名，如 'courier_id'（骑手）或 'poi_id'（商家）
+    dt_col : str
+        日期列名，默认 'dt'
+    target_col : str
+        目标列名（是否抢单），默认 'is_courier_grabbed'
+
+    Returns
+    -------
+    DataFrame
+        原表基础上新增两列:
+        {group_col}_daily_avg_rejected_count
+        {group_col}_daily_avg_rejected_rate
+    """
+    df_result = df.copy()
+
+    daily_stats = (
+        df_result.groupby([group_col, dt_col])
+        .agg(
+            total_orders=(target_col, 'count'),
+            rejected_orders=(target_col, lambda x: (x == 0).sum()),
+        )
+        .reset_index()
+    )
+
+    summary = (
+        daily_stats.groupby(group_col)
+        .agg(
+            total_orders=('total_orders', 'sum'),
+            rejected_orders=('rejected_orders', 'sum'),
+            active_days=(dt_col, 'nunique'),
+        )
+        .reset_index()
+    )
+
+    summary[f'{group_col}_daily_avg_rejected_count'] = summary['rejected_orders'] / summary['active_days']
+    summary[f'{group_col}_daily_avg_rejected_rate'] = summary['rejected_orders'] / summary['total_orders']
+
+    df_result = df_result.merge(
+        summary[[group_col, f'{group_col}_daily_avg_rejected_count', f'{group_col}_daily_avg_rejected_rate']],
+        on=group_col,
+        how='left'
+    )
+
+    print(f'\n[{group_col}] 日均拒单统计已合并到原表')
+    return df_result
+
+
 def calculate_grab_cof(df):
     """计算接单系数"""
     df_result = df.copy()
@@ -462,8 +520,17 @@ def main():
         df = max_ongoing_distance(df)
 
     # 计算骑手接单到送达的速度
-    # if 'grab_cof' not in df.columns:
-    df = calculate_grab_cof(df)
+    if 'grab_cof' not in df.columns:
+        df = calculate_grab_cof(df)
+
+    # 计算骑手日均拒单数量和日均拒单率
+    if 'courier_daily_avg_rejected_count' not in df.columns or 'courier_daily_avg_rejected_rate' not in df.columns:
+        df = daily_avg_rejection(df, group_col='courier_id')
+
+    # 计算商家日均拒单数量和日均拒单率
+    if 'poi_daily_avg_rejected_count' not in df.columns or 'poi_daily_avg_rejected_rate' not in df.columns:
+        df = daily_avg_rejection(df, group_col='poi_id')
+
     print(df.head())
     
     # 保存数据

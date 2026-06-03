@@ -1,39 +1,41 @@
 ============================================================
 Decision Tree Classification - Predict is_courier_grabbed
 ============================================================
-Number of features: 5
-Tree depth: 4
+Number of features: 7
+Tree depth: 5
 Number of leaves: 12
-Continuous features: ['fatigue', 'dispatch_to_sender_delivery_distance', 'sender_to_recipient_delivery_distance', 'ongoing_order_count', 'max_ongoing_sender_to_recipient_distance']
+Continuous features: ['fatigue', 'dispatch_to_sender_delivery_distance', 'sender_to_recipient_delivery_distance', 'ongoing_order_count', 'max_ongoing_sender_to_recipient_distance', 'courier_id_daily_avg_rejected_rate', 'poi_id_daily_avg_rejected_rate']
 Binary features: []
 
 [Train Set Evaluation]
-  Accuracy:  0.6531
-  Precision: 0.9085
-  Recall:    0.6686
-  Specificity:0.5493
-  F1 Score:  0.7703
-  ROC-AUC:   0.6455
+  Accuracy:  0.8227
+  Precision: 0.9424
+  Recall:    0.8481
+  Specificity:0.6531
+  F1 Score:  0.8927
+  ROC-AUC:   0.8600
   Confusion Matrix:
-    TN= 37288  FP= 30590
-    FN=150472  TP=303628
+    TN= 44328  FP= 23550
+    FN= 69000  TP=385100
 
 [Test Set Evaluation]
-  Accuracy:  0.6525
-  Precision: 0.9096
-  Recall:    0.6677
-  Specificity:0.5494
-  F1 Score:  0.7701
-  ROC-AUC:   0.6425
+  Accuracy:  0.8219
+  Precision: 0.9425
+  Recall:    0.8474
+  Specificity:0.6491
+  F1 Score:  0.8924
+  ROC-AUC:   0.8579
   Confusion Matrix:
-    TN=  9202  FP=  7546
-    FN= 37797  TP= 75950
+    TN= 10871  FP=  5877
+    FN= 17363  TP= 96384
 
 [Feature Importance]
 Feature                                            Importance
 --------------------------------------------------------------
-dispatch_to_sender_delivery_distance                   0.3543
-ongoing_order_count                                    0.2869
-fatigue                                                0.2219
-max_ongoing_sender_to_recipient_distance               0.0722
-sender_to_recipient_delivery_distance                  0.0648
+courier_id_daily_avg_rejected_rate                     0.9287
+poi_id_daily_avg_rejected_rate                         0.0370
+dispatch_to_sender_delivery_distance                   0.0269
+ongoing_order_count                                    0.0074
+fatigue                                                0.0000
+sender_to_recipient_delivery_distance                  0.0000
+max_ongoing_sender_to_recipient_distance               0.0000

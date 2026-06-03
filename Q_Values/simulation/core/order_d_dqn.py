@@ -55,6 +55,8 @@ class OrderDispatcherByActorCritic:
         'sender_to_recipient_delivery_distance',
         'ongoing_order_count',
         'max_ongoing_sender_to_recipient_distance',
+        'courier_id_daily_avg_rejected_rate',
+        'poi_id_daily_avg_rejected_rate',
     ]
 
     def __init__(
@@ -70,15 +72,16 @@ class OrderDispatcherByActorCritic:
             route_planner: 路径规划器
             config: 超参数配置
             candidate_selection: 候选骑手筛选方式
-                - 'distance': 按距离排序（默认）
-                - 'decision_tree': 按决策树预测接单概率排序
+                - 'distance': 按距离排序
+                - 'decision_tree': 先按距离筛选，再按决策树概率排序
+            dt_candidate_count: 决策树最终保留的候选骑手数
         """
         self.route_planner = route_planner
         self.config = config or ActorCriticConfig()
         self.ac_agent = ActorCriticAgent(self.STATE_DIM, self.ACTION_DIM, self.config)
         self.candidate_selection = candidate_selection
         self.grab_prediction = grab_prediction
-        
+
         if candidate_selection == 'decision_tree':
             model_path = (
                 Path(__file__).resolve().parent.parent.parent.parent
@@ -186,6 +189,7 @@ class OrderDispatcherByActorCritic:
         """筛选候选骑手"""
         max_orders = self.config.max_orders_per_courier
         candidate_count = self.config.candidate_count
+        dt_candidate_count = self.config.dt_candidate_count
 
         courier_candidates = []
         for cid, courier in couriers.items():
@@ -202,16 +206,21 @@ class OrderDispatcherByActorCritic:
             return []
 
         if self.candidate_selection == 'decision_tree':
-            return self._select_candidates_by_dt(order, courier_candidates, candidate_count)
-        return self._select_candidates_by_distance(order, courier_candidates, candidate_count)
+            return self._select_candidates_by_dt(order, courier_candidates, dt_candidate_count)
+        result = self._select_candidates_by_distance(order, courier_candidates, candidate_count)
+        return [(cid, c) for cid, c, _ in result]
 
     def _select_candidates_by_distance(
         self,
         order: Dict,
         courier_candidates: List[Tuple[str, Dict]],
         candidate_count: int,
-    ) -> List[Tuple[str, Dict]]:
-        """按距离排序筛选候选骑手"""
+    ) -> List[Tuple[str, Dict, float]]:
+        """按距离排序筛选候选骑手
+
+        Returns:
+            [(cid, courier, dispatch_distance)]
+        """
         order_pos = (order['sender_lng'], order['sender_lat'])
         courier_positions = [c['position'] for _, c in courier_candidates]
 
@@ -221,7 +230,7 @@ class OrderDispatcherByActorCritic:
             for (cid, courier), dist in zip(courier_candidates, distances)
         ]
         courier_distances.sort(key=lambda x: x[2])
-        candidates = [(cid, c) for cid, c, _ in courier_distances[:candidate_count]]
+        candidates = courier_distances[:candidate_count]
 
         return candidates
 
@@ -229,21 +238,30 @@ class OrderDispatcherByActorCritic:
         self,
         order: Dict,
         courier_candidates: List[Tuple[str, Dict]],
-        candidate_count: int,
+        dt_candidate_count: int,
     ) -> List[Tuple[str, Dict]]:
-        """按决策树预测接单概率排序筛选候选骑手"""
+        """先按距离取候选，再按决策树概率排序取前 dt_candidate_count 个"""
+        top_k_with_dist = self._select_candidates_by_distance(order, courier_candidates, dt_candidate_count)
+
+        if not top_k_with_dist:
+            return []
+
         features_list = np.array([
-            self._build_dt_features(order, courier)
-            for _, courier in courier_candidates
+            self._build_dt_features(order, courier, dispatch_distance=dist)
+            for cid, courier, dist in top_k_with_dist
         ])
         features_df = pd.DataFrame(features_list, columns=self.DT_FEATURE_NAMES)
         probs = self.dt_model.predict_proba(features_df)[:, 1]
-        courier_probabilities = [
-            (cid, courier, prob)
-            for (cid, courier), prob in zip(courier_candidates, probs)
+
+        prob_ranked = sorted(
+            zip(top_k_with_dist, probs),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        candidates = [
+            (cid, courier)
+            for (cid, courier, _), _ in prob_ranked[:dt_candidate_count]
         ]
-        courier_probabilities.sort(key=lambda x: x[2], reverse=True)
-        candidates = [(cid, c) for cid, c, _ in courier_probabilities[:candidate_count]]
 
         return candidates
 
@@ -323,15 +341,18 @@ class OrderDispatcherByActorCritic:
 
         return extra
 
-    def _build_dt_features(self, order: Dict, courier: Dict) -> np.ndarray:
-        features = np.zeros(5, dtype=np.float32)
+    def _build_dt_features(self, order: Dict, courier: Dict, dispatch_distance: float = None) -> np.ndarray:
+        features = np.zeros(7, dtype=np.float32)
 
         features[0] = float(courier.get('fatigue', 0.0))
 
-        courier_pos = courier.get('position')
-        if courier_pos is not None:
-            order_sender = (order['sender_lng'], order['sender_lat'])
-            features[1] = haversine_distance(courier_pos, order_sender)
+        if dispatch_distance is not None:
+            features[1] = dispatch_distance
+        else:
+            courier_pos = courier.get('position')
+            if courier_pos is not None:
+                order_sender = (order['sender_lng'], order['sender_lat'])
+                features[1] = haversine_distance(courier_pos, order_sender)
 
         order_recipient = (order['recipient_lng'], order['recipient_lat'])
         order_sender = (order['sender_lng'], order['sender_lat'])
@@ -347,6 +368,8 @@ class OrderDispatcherByActorCritic:
             if d > max_dist:
                 max_dist = d
         features[4] = max_dist
+        features[5] = float(courier.get('rejected_rate', 0))
+        features[6] = float(order.get('poi_id_daily_avg_rejected_rate', 0))
 
         return features
 
@@ -378,7 +401,7 @@ class OrderDispatcherByActorCritic:
             
             # 加载模型 + 移到 GPU
             self._grab_model.load_state_dict(
-                torch.load(model_path)
+                torch.load(model_path, weights_only=True)
             )
             self._grab_model.to(self.device)  # 模型放 GPU
             self._grab_model.eval()
