@@ -138,11 +138,21 @@ def time_convert(df, time_columns):
     tz_east8 = timezone(timedelta(hours=8))
     # 转换时间戳为东八区datetime
     for col in time_columns:
-        df_cleaned[col] = pd.to_datetime(df_cleaned[col], utc=True)
+        df_cleaned[col] = pd.to_datetime(df_cleaned[col], utc=True, unit='s')
         df_cleaned[col] = df_cleaned[col].dt.tz_convert(tz_east8)
         # 去除时区信息，只保留datetime
         df_cleaned[col] = df_cleaned[col].dt.tz_localize(None)
     print(f"\n已转换 {len(time_columns)} 个时间字段为东八区datetime格式")
+    return df_cleaned
+
+
+def time_convert_normal(df, time_columns):
+    """将时间戳转换为东八区datetime格式"""
+    df_cleaned = df.copy()
+    # 转换时间戳为东八区datetime
+    for col in time_columns:
+        df_cleaned[col] = pd.to_datetime(df_cleaned[col])
+
     return df_cleaned
 
 
@@ -471,7 +481,7 @@ def save_csv(df, output_dir, df_name):
 
 def main():
     # 读取数据
-    df = pd.read_csv(r'SPOT/Data/Data_Processed/cleaned_waybill_info.csv')
+    df = pd.read_csv(r'SPOT\Data\Data_Processed\cleaned_waybill_info_v1.csv')
     
     # 扩展位置信息
     if 'dispatch_lat' not in df.columns or 'dispatch_lng' not in df.columns:
@@ -488,7 +498,7 @@ def main():
         'order_push_time',
         'platform_order_time'
     ]
-    df = time_convert(df, time_columns)
+    df = time_convert_normal(df, time_columns)
 
     # 删除包含缺失值的行
     df = drop_na_rows(df, 'dispatch_lat')
@@ -508,8 +518,8 @@ def main():
         df = delivery_distance(df, 'sender', 'recipient')
 
     # 过滤配送速度
-    # if 'delivery_speed' not in df.columns:
-    #     df = filter_by_speed(df, speed_threshold=30)
+    if 'delivery_speed' not in df.columns:
+        df = filter_by_speed(df, speed_threshold=30)
 
     # 计算ongoing_order_set集合中的元素个数
     if 'ongoing_order_count' not in df.columns:
@@ -519,9 +529,9 @@ def main():
     if 'max_ongoing_sender_to_recipient_distance' not in df.columns:
         df = max_ongoing_distance(df)
 
-    # 计算骑手接单到送达的速度
-    if 'grab_cof' not in df.columns:
-        df = calculate_grab_cof(df)
+    # # 计算骑手接单到送达的速度
+    # if 'grab_cof' not in df.columns:
+    #     df = calculate_grab_cof(df)
 
     # 计算骑手日均拒单数量和日均拒单率
     if 'courier_daily_avg_rejected_count' not in df.columns or 'courier_daily_avg_rejected_rate' not in df.columns:

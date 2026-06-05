@@ -1,0 +1,31 @@
+|--- ongoing_order_count <= 0.50
+|   |--- dispatch_to_sender_delivery_distance <= 0.77
+|   |   |--- fatigue <= 112.88
+|   |   |   |--- fatigue <= 5.42
+|   |   |   |   |--- weights: [4512.00, 5503.40] class: 1
+|   |   |   |--- fatigue >  5.42
+|   |   |   |   |--- weights: [10169.00, 6940.64] class: 0
+|   |   |--- fatigue >  112.88
+|   |   |   |--- dispatch_to_sender_delivery_distance <= 0.26
+|   |   |   |   |--- weights: [667.00, 2225.58] class: 1
+|   |   |   |--- dispatch_to_sender_delivery_distance >  0.26
+|   |   |   |   |--- weights: [2477.00, 2919.84] class: 1
+|   |--- dispatch_to_sender_delivery_distance >  0.77
+|   |   |--- dispatch_to_sender_delivery_distance <= 2.43
+|   |   |   |--- sender_to_recipient_delivery_distance <= 4.62
+|   |   |   |   |--- weights: [14532.00, 7125.16] class: 0
+|   |   |   |--- sender_to_recipient_delivery_distance >  4.62
+|   |   |   |   |--- weights: [549.00, 739.20] class: 1
+|   |   |--- dispatch_to_sender_delivery_distance >  2.43
+|   |   |   |--- weights: [5041.00, 1079.40] class: 0
+|--- ongoing_order_count >  0.50
+|   |--- fatigue <= 136.56
+|   |   |--- dispatch_to_sender_delivery_distance <= 1.87
+|   |   |   |--- sender_to_recipient_delivery_distance <= 4.01
+|   |   |   |   |--- weights: [22743.00, 22873.62] class: 1
+|   |   |   |--- sender_to_recipient_delivery_distance >  4.01
+|   |   |   |   |--- weights: [708.00, 1554.28] class: 1
+|   |   |--- dispatch_to_sender_delivery_distance >  1.87
+|   |   |   |--- weights: [1315.00, 2655.10] class: 1
+|   |--- fatigue >  136.56
+|   |   |--- weights: [5165.00, 9957.78] class: 1

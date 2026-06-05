@@ -14,6 +14,8 @@ from sklearn.metrics import (
     roc_auc_score, confusion_matrix, classification_report
 )
 import joblib
+import matplotlib.pyplot as plt
+from sklearn.tree import plot_tree, export_text
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -30,9 +32,9 @@ def prepare_features_target(df):
         'dispatch_to_sender_delivery_distance',
         'sender_to_recipient_delivery_distance',
         'ongoing_order_count',
-        'max_ongoing_sender_to_recipient_distance',
-        'courier_id_daily_avg_rejected_rate',
-        'poi_id_daily_avg_rejected_rate',
+        # 'max_ongoing_sender_to_recipient_distance',
+        # 'courier_id_daily_avg_rejected_rate',
+        # 'poi_id_daily_avg_rejected_rate',
     ]
     binary_features = [
         # 'is_prebook',
@@ -53,12 +55,12 @@ def prepare_features_target(df):
 
 def train_decision_tree(X_train, y_train, X_val, y_val):
     model = DecisionTreeClassifier(
-        # max_depth=4,
+        max_depth=4,
         min_samples_split=20,
         min_samples_leaf=10,
-        random_state=42,
+        random_state=23,
         ccp_alpha=0.001,
-        class_weight={0: 1.0, 1: 0.3},
+        class_weight={0: 1, 1: 0.14},
     )
     model.fit(X_train, y_train)
     return model
@@ -163,6 +165,45 @@ def save_model(model, model_dir):
     print(f'Model saved to: {path}')
 
 
+def visualize_tree(model, feature_names, output_dir, max_depth=4):
+    """绘制并保存决策树结构图"""
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, 'decision_tree_structure.png')
+
+    # 文本树 — 干净展示分裂依据和结果
+    text_tree = export_text(
+        model,
+        feature_names=feature_names,
+        max_depth=max_depth,
+        show_weights=True,
+    )
+    txt_path = os.path.join(output_dir, 'decision_tree_structure.txt')
+    with open(txt_path, 'w', encoding='utf-8') as f:
+        f.write(text_tree)
+    print(f'Text tree saved to: {txt_path}')
+
+    # 图形树 — 只展示分裂条件和样本分布
+    depth = model.get_depth()
+    w = max(14, depth * 4)
+    h = max(8, depth * 2)
+    plt.figure(figsize=(w, h))
+    plot_tree(
+        model,
+        feature_names=feature_names,
+        class_names=['not_grabbed', 'grabbed'],
+        filled=True,
+        rounded=True,
+        fontsize=9,
+        max_depth=max_depth,
+        precision=1,
+        proportion=True,
+    )
+    plt.tight_layout()
+    plt.savefig(path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f'Tree visualization saved to: {path}')
+
+
 def main():
     data_path = r'SPOT/Data/Data_Processed/cleaned_waybill_info.csv'
     output_dir = r'SPOT/Results'
@@ -175,6 +216,16 @@ def main():
     X, y, feature_info = prepare_features_target(df)
     print(f'样本数: {len(X)}, 特征数: {X.shape[1]}', flush=True)
     print(f'目标描述:\n{y.describe()}', flush=True)
+
+    # 输出样本类别比例
+    class_counts = y.value_counts()
+    class_ratios = y.value_counts(normalize=True)
+    print('样本类别分布:', flush=True)
+    for label in [0, 1]:
+        cnt = class_counts.get(label, 0)
+        ratio = class_ratios.get(label, 0) * 100
+        label_name = '未接单(0)' if label == 0 else '接单(1)'
+        print(f'  {label_name}: {cnt} ({ratio:.1f}%)', flush=True)
 
     print('划分训练集和测试集...', flush=True)
     X_train, X_test, y_train, y_test = train_test_split(
@@ -196,6 +247,9 @@ def main():
 
     model_dir = r'SPOT/core/pkl_s'
     save_model(model, model_dir)
+
+    print('绘制决策树结构图...', flush=True)
+    visualize_tree(model, feature_info['all'], output_dir, max_depth=4)
 
 
 if __name__ == '__main__':

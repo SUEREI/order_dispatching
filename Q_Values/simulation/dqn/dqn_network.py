@@ -46,7 +46,7 @@ class ActorCriticConfig:
     early_stop_patience: int = 5
     early_stop_threshold: float = 1e-2
     max_orders_per_courier: int = 4
-    candidate_count: int = 300  # 距离筛选的候选骑手数
+    candidate_count: int = 500  # 距离筛选的候选骑手数
     dt_candidate_count: int = 300  # 决策树最终保留的候选骑手数
     base_revenue: float = 3.0
     distance_revenue_coeff: float = 1.5

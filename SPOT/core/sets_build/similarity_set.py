@@ -1,25 +1,19 @@
+import os
+import numpy as np
 import pandas as pd
-import random
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 pd.set_option('display.max_columns', None)
 
 
 def load_data(file_path, sample=False, sample_num=500, random_state=42, columns=[
-    # 距离相关特征
-    'sender_to_recipient_km', 'dispatch_to_sender_km', 
-    # 工作量相关特征
-    'ongoing_other_count', 'ongoing_cross_area_count', 'ongoing_max_distance_km', 'ongoing_area_km2', 
-    # 新订单与现有订单适配性相关特征
-    'area_increase_ratio', 'direction_similarity', 
-    # 疲惫程度相关特征
-    'courier_daily_completed_before_dispatch_distance', 'courier_daily_completed_before_dispatch_with_reset_distance',
-    # 区域熟悉度相关特征
-    'area_familiarity', 
-    # 时间相关特征
-    'is_weekend', 'dispatch_hour',
+    # 特征列
+    'fatigue',
+    'dispatch_to_sender_delivery_distance',
+    'sender_to_recipient_delivery_distance',
+    'ongoing_order_count',
     # 目标变量
-    'reject_penalty_ratio']):
+    'is_courier_grabbed']):
     """
     加载数据
     :param file_path: 数据文件路径
@@ -68,22 +62,30 @@ class SimilarSetBuilder:
         self.standardized_df_example[feature_cols] = self.scaler.transform(self.df_example[feature_cols])
         return self.standardized_df, self.standardized_df_example
 
-    def cal_weighted_distance(self, row1, row2):
+    def compute_distance_matrix(self):
         """
-        计算加权平方欧几里得距离
-        :param row1: 第一行数据
-        :param row2: 第二行数据
-        :return: 加权距离
+        逐样本行向量化计算加权距离矩阵，避免 (M, N, F) 三维中间数组导致内存爆炸
+        :return: (M x N) 距离矩阵 (float32), M=样本集行数, N=训练集行数
         """
         feature_cols = [col for col in self.df.columns if col != self.target_col]
-        # 计算特征的加权距离
-        feature_distance = 0
-        for col in feature_cols:
-            feature_distance += (row1[col] - row2[col]) ** 2
-        feature_distance = self.feature_weight * feature_distance
-        # 计算目标变量的加权距离
-        target_distance = self.target_weight * (row1[self.target_col] - row2[self.target_col]) ** 2
-        return feature_distance + target_distance
+        
+        # 转为 float32 减半内存
+        X_train = self.standardized_df[feature_cols].values.astype(np.float32)
+        X_example = self.standardized_df_example[feature_cols].values.astype(np.float32)
+        y_train = self.standardized_df[self.target_col].values.astype(np.float32)
+        y_example = self.standardized_df_example[self.target_col].values.astype(np.float32)
+        
+        M, N = X_example.shape[0], X_train.shape[0]
+        dist_matrix = np.empty((M, N), dtype=np.float32)
+        
+        for i in tqdm(range(M), desc="计算距离矩阵"):
+            # (N, F) - (1, F) -> (N, F) -> sum(axis=1) -> (N,)
+            diff = X_train - X_example[i:i+1]
+            feature_dist = self.feature_weight * (diff ** 2).sum(axis=1)
+            target_dist = self.target_weight * (y_train - y_example[i]) ** 2
+            dist_matrix[i] = feature_dist + target_dist
+        
+        return dist_matrix
 
     def calculate_weights(self, result_df):
         """
@@ -117,19 +119,13 @@ class SimilarSetBuilder:
         result_df['similar_set_weight'] = None
         result_df['normalized_weight'] = None
         
-        # 预计算样本集与训练集的距离矩阵
-        distance_matrix = {}
-        for example_idx, example_row in tqdm(self.standardized_df_example.iterrows(), 
-                                             total=len(self.standardized_df_example),
-                                             desc="计算距离矩阵"):
-            distances = []
-            for train_idx, train_row in self.standardized_df.iterrows():
-                distance = self.cal_weighted_distance(example_row, train_row)
-                distances.append((train_idx, distance))
-            distance_matrix[example_idx] = distances
+        # 预计算样本集与训练集的距离矩阵 (向量化加速)
+        distance_matrix = self.compute_distance_matrix()  # (M, N)
+        M, N = distance_matrix.shape
+        train_index_list = list(self.standardized_df.index)
         
-        # 剩余训练集索引集合
-        remaining_train_indices = set(self.standardized_df.index)
+        # 可用训练集标记 (布尔数组，比 Python set 查找快得多)
+        available = np.ones(N, dtype=bool)
         # 相似集编号
         set_id = 0
         # 计算最大可能的相似集数量
@@ -137,24 +133,24 @@ class SimilarSetBuilder:
         
         # 重复构建相似集，直到剩余训练集数量不足以构建一个完整的相似集
         with tqdm(total=max_sets, desc="构建相似集") as pbar:
-            while len(remaining_train_indices) >= len(self.standardized_df_example):
-                # 本次相似集的样本索引
+            while available.sum() >= M:
+                # 本次相似集的样本索引和距离
                 similar_indices = []
                 similar_distances = []
                 
                 # 遍历样本集的每一行
-                for example_idx, example_row in self.standardized_df_example.iterrows():
-                    # 从预计算的距离矩阵中筛选剩余训练集的距离
-                    remaining_distances = [(idx, dist) for idx, dist in distance_matrix[example_idx] 
-                                          if idx in remaining_train_indices]
-                    # 找到距离最小的行
-                    min_distance_pair = min(remaining_distances, key=lambda x: x[1])
-                    best_train_idx, min_distance = min_distance_pair
-                    # 记录相似样本信息
+                for example_idx in range(M):
+                    dist_row = distance_matrix[example_idx]
+                    # 已匹配行的距离设无穷大，argmin 取最近可用行
+                    valid_distances = np.where(available, dist_row, np.inf)
+                    best_global_col = np.argmin(valid_distances)
+                    
+                    best_train_idx = train_index_list[best_global_col]
+                    min_distance = valid_distances[best_global_col]
+                    
                     similar_indices.append(best_train_idx)
                     similar_distances.append(min_distance)
-                    # 从剩余训练集中移除已匹配的行
-                    remaining_train_indices.remove(best_train_idx)
+                    available[best_global_col] = False
                 
                 # 为本次相似集的样本标记信息
                 for idx, dist in zip(similar_indices, similar_distances):
@@ -165,7 +161,7 @@ class SimilarSetBuilder:
                 set_id += 1
                 # 更新进度条
                 pbar.update(1)
-                pbar.set_postfix({"剩余训练集": len(remaining_train_indices)})
+                pbar.set_postfix({"剩余训练集": int(available.sum())})
         
         # 删除未被分配到相似集的多余行
         result_df = result_df[result_df['similar_set_id'].notna()].reset_index(drop=True)
@@ -176,32 +172,55 @@ class SimilarSetBuilder:
         
 
 if __name__ == '__main__':
+    from sklearn.model_selection import train_test_split
+    
     # 加载数据
-    df = load_data(r'all_waybill_info_meituan.csv')
-    df_example = load_data(r'all_waybill_info_meituan.csv', sample=True, sample_num=50, random_state=32)
+    df = load_data(r'SPOT\Data\Data_Processed\cleaned_waybill_info.csv')
+    df_example = load_data(r'SPOT\core\sets_build\sample_sets\sample_522093.csv', sample=False)
     
-    # 创建相似集构建器
-    builder = SimilarSetBuilder(df, df_example, target_col='reject_penalty_ratio', feature_weight=0.7)
-    
-    # 构建相似集
-    result_df = builder.build_similarity_sets()
-    
-    # 输出结果
-    print("相似集构建完成！")
-    print(f"训练集数据量: {len(df)}")
+    # 划分训练集和测试集 (7:3)
+    df_train, df_test = train_test_split(df, test_size=0.3, random_state=42)
+    print(f"原始数据量: {len(df)}")
+    print(f"训练集数据量: {len(df_train)}")
+    print(f"测试集数据量: {len(df_test)}")
     print(f"样本集数据量: {len(df_example)}")
-    print(f"相似集数量: {result_df['similar_set_id'].nunique()}")
-    print("\n结果数据框形状:", result_df.shape)
-    print("\n结果数据框列名:", result_df.columns.tolist())
-    print("\n前10行数据:")
-    print(result_df.head(10))
-    print("\n相似集统计:")
-    print(result_df.groupby('similar_set_id').agg({
-        'similar_sample_distance': ['sum', 'mean'],
-        'similar_set_weight': 'first',
-        'normalized_weight': 'first'
-    }).head(10))
+    
+    # ========== 训练集构建相似集 ==========
+    print("\n===== 训练集相似集构建 =====")
+    builder_train = SimilarSetBuilder(df_train, df_example, target_col='is_courier_grabbed', feature_weight=0.7)
+    result_train_df = builder_train.build_similarity_sets()
+    print(f"训练集相似集数量: {result_train_df['similar_set_id'].nunique()}")
+    
+    # ========== 测试集构建相似集 ==========
+    print("\n===== 测试集相似集构建 =====")
+    builder_test = SimilarSetBuilder(df_test, df_example, target_col='is_courier_grabbed', feature_weight=0.7)
+    result_test_df = builder_test.build_similarity_sets()
+    print(f"测试集相似集数量: {result_test_df['similar_set_id'].nunique()}")
+    
+    # 输出结果概览
+    print("\n========== 结果概览 ==========")
+    print("训练集结果形状:", result_train_df.shape)
+    print("测试集结果形状:", result_test_df.shape)
+    print("\n训练集前5行:")
+    print(result_train_df.head(5))
+    print("\n测试集前5行:")
+    print(result_test_df.head(5))
     
     # 保存结果为CSV文件
-    result_df.to_csv('similarity_sets_result.csv', index=False, encoding='utf-8-sig')
-    print("\n结果已保存到 similarity_sets_result.csv")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
+    output_dir = os.path.join(project_root, 'Data', 'Data_Processed')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    train_output_path = os.path.join(output_dir, 'similarity_sets_train.csv')
+    test_output_path = os.path.join(output_dir, 'similarity_sets_test.csv')
+    result_train_df.to_csv(train_output_path, index=False, encoding='utf-8-sig')
+    result_test_df.to_csv(test_output_path, index=False, encoding='utf-8-sig')
+    print(f"\n训练集结果已保存到 {train_output_path}")
+    print(f"测试集结果已保存到 {test_output_path}")
+    
+    # 汇总信息
+    print("\n========== 汇总 ==========")
+    print(f"原始数据: {len(df)} 条")
+    print(f"训练集: {len(df_train)} 条, 相似集 {result_train_df['similar_set_id'].nunique()} 个")
+    print(f"测试集: {len(df_test)} 条, 相似集 {result_test_df['similar_set_id'].nunique()} 个")

@@ -54,9 +54,9 @@ class OrderDispatcherByActorCritic:
         'dispatch_to_sender_delivery_distance',
         'sender_to_recipient_delivery_distance',
         'ongoing_order_count',
-        'max_ongoing_sender_to_recipient_distance',
-        'courier_id_daily_avg_rejected_rate',
-        'poi_id_daily_avg_rejected_rate',
+        # 'max_ongoing_sender_to_recipient_distance',
+        # 'courier_id_daily_avg_rejected_rate',
+        # 'poi_id_daily_avg_rejected_rate',
     ]
 
     def __init__(
@@ -64,7 +64,8 @@ class OrderDispatcherByActorCritic:
         route_planner: RoutePlanner,
         config: ActorCriticConfig = None,
         grab_prediction: bool = True,
-        candidate_selection: str = 'distance',
+        candidate_selection: str = 'decision_tree',
+        dt_prob_threshold: float = 0.5,
     ):
         """初始化 Actor-Critic 分派器
 
@@ -73,16 +74,18 @@ class OrderDispatcherByActorCritic:
             config: 超参数配置
             candidate_selection: 候选骑手筛选方式
                 - 'distance': 按距离排序
-                - 'decision_tree': 先按距离筛选，再按决策树概率排序
-            dt_candidate_count: 决策树最终保留的候选骑手数
+                - 'decision_tree': 先按距离筛选，再按决策树概率排序取 top-K
+                - 'decision_tree_threshold': 先按距离筛选，再按决策树概率 > 阈值筛选
+            dt_prob_threshold: decision_tree_threshold 模式的决策树概率阈值
         """
         self.route_planner = route_planner
         self.config = config or ActorCriticConfig()
         self.ac_agent = ActorCriticAgent(self.STATE_DIM, self.ACTION_DIM, self.config)
         self.candidate_selection = candidate_selection
         self.grab_prediction = grab_prediction
+        self.dt_prob_threshold = dt_prob_threshold
 
-        if candidate_selection == 'decision_tree':
+        if candidate_selection in ('decision_tree', 'decision_tree_threshold'):
             model_path = (
                 Path(__file__).resolve().parent.parent.parent.parent
                 / 'SPOT' / 'core' / 'pkl_s' / 'decision_tree_model.pkl'
@@ -207,6 +210,8 @@ class OrderDispatcherByActorCritic:
 
         if self.candidate_selection == 'decision_tree':
             return self._select_candidates_by_dt(order, courier_candidates, dt_candidate_count)
+        elif self.candidate_selection == 'decision_tree_threshold':
+            return self._select_candidates_by_dt_threshold(order, courier_candidates, candidate_count)
         result = self._select_candidates_by_distance(order, courier_candidates, candidate_count)
         return [(cid, c) for cid, c, _ in result]
 
@@ -262,6 +267,37 @@ class OrderDispatcherByActorCritic:
             (cid, courier)
             for (cid, courier, _), _ in prob_ranked[:dt_candidate_count]
         ]
+
+        return candidates
+
+    def _select_candidates_by_dt_threshold(
+        self,
+        order: Dict,
+        courier_candidates: List[Tuple[str, Dict]],
+        candidate_count: int,
+    ) -> List[Tuple[str, Dict]]:
+        """先按距离取候选，再用决策树预测，只保留概率 > 阈值的骑手"""
+        top_k_with_dist = self._select_candidates_by_distance(order, courier_candidates, candidate_count)
+
+        if not top_k_with_dist:
+            return []
+
+        features_list = np.array([
+            self._build_dt_features(order, courier, dispatch_distance=dist)
+            for cid, courier, dist in top_k_with_dist
+        ])
+        features_df = pd.DataFrame(features_list, columns=self.DT_FEATURE_NAMES)
+        probs = self.dt_model.predict_proba(features_df)[:, 1]
+
+        candidates = [
+            (cid, courier)
+            for (cid, courier, _), prob in zip(top_k_with_dist, probs)
+            if prob > self.dt_prob_threshold
+        ]
+
+        # logger.info(
+        #     features_df
+        # )
 
         return candidates
 
@@ -342,34 +378,34 @@ class OrderDispatcherByActorCritic:
         return extra
 
     def _build_dt_features(self, order: Dict, courier: Dict, dispatch_distance: float = None) -> np.ndarray:
-        features = np.zeros(7, dtype=np.float32)
+        features = np.zeros(4, dtype=np.float32)
 
         features[0] = float(courier.get('fatigue', 0.0))
 
         if dispatch_distance is not None:
-            features[1] = dispatch_distance
+            features[1] = dispatch_distance / 1000.0  # 转换为公里
         else:
             courier_pos = courier.get('position')
             if courier_pos is not None:
                 order_sender = (order['sender_lng'], order['sender_lat'])
-                features[1] = haversine_distance(courier_pos, order_sender)
+                features[1] = haversine_distance(courier_pos, order_sender) / 1000.0  # 转换为公里
 
         order_recipient = (order['recipient_lng'], order['recipient_lat'])
         order_sender = (order['sender_lng'], order['sender_lat'])
-        features[2] = haversine_distance(order_sender, order_recipient)
+        features[2] = haversine_distance(order_sender, order_recipient) / 1000.0  # 转换为公里
 
         features[3] = float(len(courier.get('current_orders', [])))
 
-        max_dist = 0.0
-        for o in courier.get('current_orders', []):
-            o_sender = (o['sender_lng'], o['sender_lat'])
-            o_recipient = (o['recipient_lng'], o['recipient_lat'])
-            d = haversine_distance(o_sender, o_recipient)
-            if d > max_dist:
-                max_dist = d
-        features[4] = max_dist
-        features[5] = float(courier.get('rejected_rate', 0))
-        features[6] = float(order.get('poi_id_daily_avg_rejected_rate', 0))
+        # max_dist = 0.0
+        # for o in courier.get('current_orders', []):
+        #     o_sender = (o['sender_lng'], o['sender_lat'])
+        #     o_recipient = (o['recipient_lng'], o['recipient_lat'])
+        #     d = haversine_distance(o_sender, o_recipient)
+        #     if d > max_dist:
+        #         max_dist = d
+        # features[4] = max_dist
+        # features[5] = float(courier.get('rejected_rate', 0))
+        # features[6] = float(order.get('poi_id_daily_avg_rejected_rate', 0))
 
         return features
 

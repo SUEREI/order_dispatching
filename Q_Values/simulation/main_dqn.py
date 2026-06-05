@@ -262,11 +262,18 @@ def _compute_delivery_metrics(orders_df):
     rejected_count = int(orders_df['status'].eq('rejected').sum()) if 'status' in orders_df.columns else 0
     rejection_rate = rejected_count / len(orders_df) if len(orders_df) > 0 else 0.0
 
+    # 非重复拒单统计
+    rejected_unique_count = int(orders_df.loc[orders_df['status'] == 'rejected', 'order_id'].nunique()) if 'status' in orders_df.columns else 0
+    total_unique_count = int(orders_df['order_id'].nunique())
+    rejection_rate_unique = rejected_unique_count / total_unique_count if total_unique_count > 0 else 0.0
+
     return {
         'total': len(orders_df),
         'delivered_count': len(delivered),
         'rejected_count': rejected_count,
         'rejection_rate': rejection_rate,
+        'rejected_unique_count': rejected_unique_count,
+        'rejection_rate_unique': rejection_rate_unique,
         'timeout_count': len(timeout_orders),
         'avg_delivery_duration': delivered['delivery_duration'].mean(),
         'overtime_rate': len(timeout_orders) / len(delivered),
@@ -332,8 +339,8 @@ def _log_period_summary(period, metrics):
     logger.info(
         f"===== 第 {period} 个周期结束，训练前指标 =====\n"
         f"已送达订单数: {metrics['delivered_count']}\n"
-        f"拒单数: {metrics['rejected_count']}\n"
         f"拒单率: {metrics['rejection_rate']:.2%}\n"
+        f"拒单率-非重复计数: {metrics['rejection_rate_unique']:.2%}\n"
         f"平均配送时长: {metrics['avg_delivery_duration']:.2f}分钟\n"
         f"超时率: {metrics['overtime_rate']:.2%}\n"
         f"平均超时时长: {metrics['avg_overtime']:.2f}分钟\n"
@@ -349,8 +356,8 @@ def _log_final_summary(metrics):
     logger.info(
         f"总订单数: {metrics['total']}\n"
         f"已送达订单数: {metrics['delivered_count']}\n"
-        f"拒单数: {metrics['rejected_count']}\n"
         f"拒单率: {metrics['rejection_rate']:.2%}\n"
+        f"拒单率-非重复计数: {metrics['rejection_rate_unique']:.2%}\n"
         f"平均配送时长: {metrics['avg_delivery_duration']:.2f}分钟\n"
         f"超时订单数: {metrics['timeout_count']}\n"
         f"超时率: {metrics['overtime_rate']:.2%}\n"
