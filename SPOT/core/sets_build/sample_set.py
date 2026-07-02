@@ -33,15 +33,15 @@ logger = logging.getLogger(__name__)
 #  特征列名（与 decision_tree.py 保持一致）
 # ============================================================
 
-FEATURE_NAMES = [
-    'fatigue',
-    'dispatch_to_sender_delivery_distance',
-    'sender_to_recipient_delivery_distance',
-    'ongoing_order_count',
-    'max_ongoing_sender_to_recipient_distance',
-    'courier_id_daily_avg_rejected_rate',
-    'poi_id_daily_avg_rejected_rate',
-]
+# FEATURE_NAMES = [
+#     'fatigue',
+#     'dispatch_to_sender_delivery_distance',
+#     'sender_to_recipient_delivery_distance',
+#     'ongoing_order_count',
+#     'max_ongoing_sender_to_recipient_distance',
+#     'courier_id_daily_avg_rejected_rate',
+#     'poi_id_daily_avg_rejected_rate',
+# ]
 
 TARGET = 'is_courier_grabbed'
 
@@ -58,6 +58,8 @@ _DT_FEATURES = [
     'dispatch_to_sender_delivery_distance',
     'sender_to_recipient_delivery_distance',
     'ongoing_order_count',
+    'courier_prefer_reject',
+    'poi_prefer_reject',
 ]
 
 
@@ -70,7 +72,7 @@ def _ensure_dt():
 
     model_path = (
         Path(__file__).resolve().parent.parent
-        / 'pkl_s' / 'decision_tree_model.pkl'
+        / 'pkl_s' / 'decision_tree_model_grab.pkl'
     )
     _DT_MODEL = joblib.load(str(model_path))
     print(f'决策树模型已加载: {model_path}')
@@ -134,9 +136,11 @@ def build_courier_features(order: dict, courier: dict) -> dict:
             (order['recipient_lng'], order['recipient_lat'])
         ) / 1000.0,
         'ongoing_order_count': float(len(ongoing_orders)),
-        'max_ongoing_sender_to_recipient_distance': max_dist / 1000.0,
-        'courier_id_daily_avg_rejected_rate': float(courier.get('rejected_rate', 0.0)),
-        'poi_id_daily_avg_rejected_rate': float(order.get('poi_id_daily_avg_rejected_rate', 0.0)),
+        # 'max_ongoing_sender_to_recipient_distance': max_dist / 1000.0,
+        'courier_prefer_reject': float(courier.get('prefer_reject', 0.0)),
+        'poi_prefer_reject': float(order.get('poi_prefer_reject', 0.0)),
+        # 'courier_id_daily_avg_rejected_rate': float(courier.get('rejected_rate', 0.0)),
+        # 'poi_id_daily_avg_rejected_rate': float(order.get('poi_id_daily_avg_rejected_rate', 0.0)),
     }
 
 

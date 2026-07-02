@@ -1,0 +1,32 @@
+2026-07-02 03:00:11,981 | __main__ | INFO | 使用随机种子: 44
+2026-07-02 03:00:16,798 | __main__ | INFO | 按日期筛选: [20221023, 20221024]，剩余 145081 条订单
+2026-07-02 03:00:16,798 | core.order_g | INFO | 正在加载订单数据
+2026-07-02 03:00:25,348 | core.order_g | INFO | 订单数据加载完成，共 145081 条订单
+2026-07-02 03:00:29,448 | core.courier | INFO | 骑手模拟器初始化完成，共生成 35288 个上下线事件
+2026-07-02 03:00:29,453 | core.courier | INFO | 涉及骑手数: 4106
+2026-07-02 03:00:29,455 | core.state | INFO | 状态刷新器初始化完成，骑手速度: 30.0 KM/H, 时间步长: 30 秒
+2026-07-02 03:00:29,455 | core.route | INFO | 路径规划器初始化完成
+2026-07-02 03:00:29,457 | dqn.dqn_network | INFO | 加载的候选骑手数量: 500, 决策树最终保留的候选骑手数: 300
+2026-07-02 03:00:33,515 | dqn.dqn_network | INFO | Actor-Critic 训练设备: cuda | NVIDIA GeForce RTX 4060 Laptop GPU
+2026-07-02 03:00:33,515 | dqn.dqn_network | INFO | Actor 网络结构: state_dim=27, action_dim=5, hidden_dims=[256, 128, 64]
+2026-07-02 03:00:33,516 | dqn.dqn_network | INFO | Critic 网络结构: state_dim=27, hidden_dims=[256, 128, 64]
+2026-07-02 03:00:33,516 | dqn.dqn_network | INFO | 经验回放缓冲区容量: 70000, 批次大小: 128
+2026-07-02 03:00:33,519 | core.order_d_dqn | INFO | 尝试加载决策树模型: D:\Sys\Desktop\毕业论文\2 Python\SPOT\core\pkl_s\decision_tree_model.pkl
+2026-07-02 03:00:33,522 | core.order_d_dqn | INFO | 决策树模型已加载: D:\Sys\Desktop\毕业论文\2 Python\SPOT\core\pkl_s\decision_tree_model.pkl
+2026-07-02 03:00:33,522 | core.order_d_dqn | INFO | Actor-Critic 订单分派器初始化完成，候选筛选方式: decision_tree
+2026-07-02 03:00:33,576 | dqn.dqn_network | INFO | Actor 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-07-02 03:00:33,576 | dqn.dqn_network | INFO | Critic 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-07-02 03:00:33,577 | dqn.dqn_network | INFO | Target Critic 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-07-02 03:00:33,578 | __main__ | INFO | 已加载模型: Q_Values\simulation\dqn\checkpoints\dqn_model.pth | 模式: 评估
+2026-07-02 03:00:33,923 | core.order_d_dqn | INFO | 决策树模型已加载: D:\Sys\Desktop\毕业论文\2 Python\SPOT\core\pkl_s\decision_tree_model_grab.pkl
+2026-07-02 03:33:41,510 | __main__ | INFO | 评估模式：不记录周期指标
+2026-07-02 03:33:50,770 | __main__ | INFO | 总订单数: 223186
+已送达订单数: 145081
+拒单率: 35.00%
+拒单率-非重复计数: 31.53%
+平均配送时长: 24.88分钟
+超时订单数: 16790
+超时率: 11.57%
+平均超时时长: 7.55分钟
+骑手平均订单收益: 4.68
+2026-07-02 03:33:58,991 | __main__ | INFO | 订单结果已保存到 Q_Values\simulation\simulation_result\dqn_dispatch_20221023.csv

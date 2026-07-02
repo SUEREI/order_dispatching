@@ -46,8 +46,8 @@ class ActorCriticConfig:
     early_stop_patience: int = 5
     early_stop_threshold: float = 1e-2
     max_orders_per_courier: int = 4
-    candidate_count: int = 500  # 距离筛选的候选骑手数
-    dt_candidate_count: int = 300  # 决策树最终保留的候选骑手数
+    candidate_count: int = 300  # 距离筛选的候选骑手数
+    dt_candidate_count: int = 200  # 决策树最终保留的候选骑手数
     base_revenue: float = 3.0
     distance_revenue_coeff: float = 1.5
     max_delivery_time: float = 3600.0
@@ -65,6 +65,21 @@ class ActorCriticConfig:
             self.actor_hidden_dims = [256, 128, 64]
         if self.critic_hidden_dims is None:
             self.critic_hidden_dims = [256, 128, 64]
+
+        # 从 config.yaml 加载候选骑手数量，覆盖类默认值
+        try:
+            import yaml
+            from pathlib import Path
+            config_path = Path(__file__).resolve().parent.parent / 'config' / 'config.yaml'
+            with open(config_path, 'r', encoding='utf-8') as f:
+                yaml_config = yaml.safe_load(f)
+            if 'top_k_with_dist' in yaml_config:
+                self.candidate_count = yaml_config['top_k_with_dist']
+            if 'top_k_with_dt' in yaml_config:
+                self.dt_candidate_count = yaml_config['top_k_with_dt']
+        except Exception:
+            pass  # 加载失败则使用类定义中的默认值
+        logger.info(f"加载的候选骑手数量: {self.candidate_count}, 决策树最终保留的候选骑手数: {self.dt_candidate_count}")
 
 
 class ReplayBuffer:

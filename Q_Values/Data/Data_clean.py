@@ -72,9 +72,56 @@ def daily_avg_rejection(df, group_col, dt_col='dt', target_col='is_courier_grabb
     return df_result
 
 
+def add_prefer_reject_label(df):
+    """
+    添加骑手和商家是否偏好拒单的标签（1/0）
+
+    判断逻辑：对骑手和商家分别计算各自的实体平均拒单率，
+              若该实体拒单率高于实体平均拒单率，则为1，否则为0
+    """
+    df_result = df.copy()
+
+    # 骑手偏好拒单标签
+    if 'courier_id_daily_avg_rejected_rate' in df_result.columns:
+        courier_rates = df_result[['courier_id', 'courier_id_daily_avg_rejected_rate']].drop_duplicates()
+        courier_avg_rate = courier_rates['courier_id_daily_avg_rejected_rate'].mean()
+        courier_rates['courier_prefer_reject'] = (
+            courier_rates['courier_id_daily_avg_rejected_rate'] > 3 * courier_avg_rate
+        ).astype(int)
+        df_result = df_result.merge(
+            courier_rates[['courier_id', 'courier_prefer_reject']],
+            on='courier_id',
+            how='left'
+        )
+        prefer_count = courier_rates['courier_prefer_reject'].sum()
+        total_couriers = len(courier_rates)
+        print(f'骑手平均拒单率: {courier_avg_rate:.4f}')
+        print(f'骑手偏好拒单标签: {prefer_count}/{total_couriers} 个骑手标记为1')
+
+    # 商家偏好拒单标签
+    if 'poi_id_daily_avg_rejected_rate' in df_result.columns:
+        poi_rates = df_result[['poi_id', 'poi_id_daily_avg_rejected_rate']].drop_duplicates()
+        poi_avg_rate = poi_rates['poi_id_daily_avg_rejected_rate'].mean()
+        poi_rates['poi_prefer_reject'] = (
+            poi_rates['poi_id_daily_avg_rejected_rate'] > 3 * poi_avg_rate
+        ).astype(int)
+        df_result = df_result.merge(
+            poi_rates[['poi_id', 'poi_prefer_reject']],
+            on='poi_id',
+            how='left'
+        )
+        prefer_count = poi_rates['poi_prefer_reject'].sum()
+        total_pois = len(poi_rates)
+        print(f'商家平均拒单率: {poi_avg_rate:.4f}')
+        print(f'商家偏好拒单标签: {prefer_count}/{total_pois} 个商家标记为1')
+
+    return df_result
+
+
 # 计算日均拒单统计
 df = daily_avg_rejection(df, 'courier_id')
 df = daily_avg_rejection(df, 'poi_id')
+df = add_prefer_reject_label(df)
 
 # 1. 去除is_courier_grabbed为0的字段
 print("\n正在进行数据清洗...")

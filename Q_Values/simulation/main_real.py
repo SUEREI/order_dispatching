@@ -13,7 +13,7 @@ import pandas as pd
 
 from core import CourierSimulator
 from core import OrderGenerator
-from core import OrderDispatcherByDistance, OrderDispatcherByRealMatch
+from core import OrderDispatcherByRealMatch
 from core import RoutePlanner
 from core import StateRefresher
 from utils import haversine_distance
@@ -65,7 +65,6 @@ class DeliverySimulation:
         self.courier_sim = CourierSimulator(self.df, idle_timeout_minutes)
         # 初始化派单器、路由规划器、状态刷新器
         self.state_refresher = StateRefresher()
-        self.dispatcher_distance = OrderDispatcherByDistance()
         self.dispatcher_real = OrderDispatcherByRealMatch(self.df)
         self.route_planner = RoutePlanner()
         
@@ -96,6 +95,9 @@ class DeliverySimulation:
                 'courier_id': cid,
                 'status': 'offline',
                 'position': None,  # 上线时会设置初始位置
+                'fatigue': 0,
+                'rejected_rate': None,
+                'has_had_orders': False,
                 'order_increased': False,
                 'current_orders': [],
                 'route': []
@@ -133,10 +135,12 @@ class DeliverySimulation:
                 
         # 2. 处理当前时间点的骑手上下线事件
         courier_events = self.courier_sim.get_events_at_time(self.current_time)
-        for cid, etype, pos in courier_events:
+        for cid, etype, pos, reject_rate in courier_events:
             self.couriers[cid]['status'] = etype
             if etype == 'online':
                 self.couriers[cid]['position'] = pos
+                self.couriers[cid]['fatigue'] = 0
+                self.couriers[cid]['rejected_rate'] = reject_rate
         online_couriers = {cid: info for cid, info in self.couriers.items() if info['status'] == 'online'}
         # logger.info(f"当前时间点 {self.current_time} 的在线骑手数量: {len(online_couriers)}")
         
@@ -187,7 +191,7 @@ class DeliverySimulation:
 if __name__ == '__main__':
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
     # DATE_FILTER = None
-    DATE_FILTER = [20221023]
+    DATE_FILTER = [20221023, 20221024]
 
     sim = DeliverySimulation(r'Q_Values/Data/Data_Processed/cleaned_waybill_info.csv', date_filter=DATE_FILTER)
 

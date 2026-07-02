@@ -469,6 +469,52 @@ def calculate_grab_cof(df):
     return df_result
 
 
+def add_prefer_reject_label(df):
+    """
+    添加骑手和商家是否偏好拒单的标签（1/0）
+
+    判断逻辑：对骑手和商家分别计算各自的实体平均拒单率，
+              若该实体拒单率高于实体平均拒单率，则为1，否则为0
+    """
+    df_result = df.copy()
+
+    # 骑手偏好拒单标签
+    if 'courier_id_daily_avg_rejected_rate' in df_result.columns:
+        courier_rates = df_result[['courier_id', 'courier_id_daily_avg_rejected_rate']].drop_duplicates()
+        courier_avg_rate = courier_rates['courier_id_daily_avg_rejected_rate'].mean()
+        courier_rates['courier_prefer_reject'] = (
+            courier_rates['courier_id_daily_avg_rejected_rate'] > 3 * courier_avg_rate
+        ).astype(int)
+        df_result = df_result.merge(
+            courier_rates[['courier_id', 'courier_prefer_reject']],
+            on='courier_id',
+            how='left'
+        )
+        prefer_count = courier_rates['courier_prefer_reject'].sum()
+        total_couriers = len(courier_rates)
+        print(f'骑手平均拒单率: {courier_avg_rate:.4f}')
+        print(f'骑手偏好拒单标签: {prefer_count}/{total_couriers} 个骑手标记为1')
+
+    # 商家偏好拒单标签
+    if 'poi_id_daily_avg_rejected_rate' in df_result.columns:
+        poi_rates = df_result[['poi_id', 'poi_id_daily_avg_rejected_rate']].drop_duplicates()
+        poi_avg_rate = poi_rates['poi_id_daily_avg_rejected_rate'].mean()
+        poi_rates['poi_prefer_reject'] = (
+            poi_rates['poi_id_daily_avg_rejected_rate'] > 3 * poi_avg_rate
+        ).astype(int)
+        df_result = df_result.merge(
+            poi_rates[['poi_id', 'poi_prefer_reject']],
+            on='poi_id',
+            how='left'
+        )
+        prefer_count = poi_rates['poi_prefer_reject'].sum()
+        total_pois = len(poi_rates)
+        print(f'商家平均拒单率: {poi_avg_rate:.4f}')
+        print(f'商家偏好拒单标签: {prefer_count}/{total_pois} 个商家标记为1')
+
+    return df_result
+
+
 def save_csv(df, output_dir, df_name):
     """保存数据"""
     # 确保输出目录存在
@@ -481,7 +527,7 @@ def save_csv(df, output_dir, df_name):
 
 def main():
     # 读取数据
-    df = pd.read_csv(r'SPOT\Data\Data_Processed\cleaned_waybill_info_v1.csv')
+    df = pd.read_csv(r'SPOT\Data\Data_Processed\cleaned_waybill_info.csv')
     
     # 扩展位置信息
     if 'dispatch_lat' not in df.columns or 'dispatch_lng' not in df.columns:
@@ -534,12 +580,16 @@ def main():
     #     df = calculate_grab_cof(df)
 
     # 计算骑手日均拒单数量和日均拒单率
-    if 'courier_daily_avg_rejected_count' not in df.columns or 'courier_daily_avg_rejected_rate' not in df.columns:
+    if 'courier_id_daily_avg_rejected_count' not in df.columns or 'courier_id_daily_avg_rejected_rate' not in df.columns:
         df = daily_avg_rejection(df, group_col='courier_id')
 
     # 计算商家日均拒单数量和日均拒单率
-    if 'poi_daily_avg_rejected_count' not in df.columns or 'poi_daily_avg_rejected_rate' not in df.columns:
+    if 'poi_id_daily_avg_rejected_count' not in df.columns or 'poi_id_daily_avg_rejected_rate' not in df.columns:
         df = daily_avg_rejection(df, group_col='poi_id')
+
+    # 添加骑手/商家是否偏好拒单的标签
+    if 'courier_prefer_reject' not in df.columns or 'poi_prefer_reject' not in df.columns:
+        df = add_prefer_reject_label(df)
 
     print(df.head())
     

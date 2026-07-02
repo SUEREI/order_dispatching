@@ -32,6 +32,8 @@ def prepare_features_target(df):
         'dispatch_to_sender_delivery_distance',
         'sender_to_recipient_delivery_distance',
         'ongoing_order_count',
+        'courier_prefer_reject',
+        'poi_prefer_reject',
         # 'max_ongoing_sender_to_recipient_distance',
         # 'courier_id_daily_avg_rejected_rate',
         # 'poi_id_daily_avg_rejected_rate',
@@ -55,12 +57,12 @@ def prepare_features_target(df):
 
 def train_decision_tree(X_train, y_train, X_val, y_val):
     model = DecisionTreeClassifier(
-        max_depth=4,
+        max_depth=3,
         min_samples_split=20,
         min_samples_leaf=10,
         random_state=23,
         ccp_alpha=0.001,
-        class_weight={0: 1, 1: 0.14},
+        class_weight={0: 1, 1: 0.3},
     )
     model.fit(X_train, y_train)
     return model

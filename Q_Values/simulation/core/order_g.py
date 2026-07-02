@@ -41,6 +41,7 @@ class OrderGenerator:
                     'estimate_meal_prepare_time': row['estimate_meal_prepare_time'],
                     'estimate_arrived_time': row['estimate_arrived_time'],
                     'poi_id_daily_avg_rejected_rate': row['poi_id_daily_avg_rejected_rate'],
+                    'poi_prefer_reject': row['poi_prefer_reject'],
                     'is_prebook': row['is_prebook'],
                     'is_weekend': row['is_weekend'],
                     'status': 'pending',

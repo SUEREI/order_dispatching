@@ -12,6 +12,8 @@ def load_data(file_path, sample=False, sample_num=500, random_state=42, columns=
     'dispatch_to_sender_delivery_distance',
     'sender_to_recipient_delivery_distance',
     'ongoing_order_count',
+    'courier_prefer_reject',
+    'poi_prefer_reject',
     # 目标变量
     'is_courier_grabbed']):
     """

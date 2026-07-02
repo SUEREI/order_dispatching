@@ -1,38 +1,40 @@
 ============================================================
 Decision Tree Classification - Predict is_courier_grabbed
 ============================================================
-Number of features: 4
-Tree depth: 4
-Number of leaves: 11
-Continuous features: ['fatigue', 'dispatch_to_sender_delivery_distance', 'sender_to_recipient_delivery_distance', 'ongoing_order_count']
+Number of features: 6
+Tree depth: 3
+Number of leaves: 5
+Continuous features: ['fatigue', 'dispatch_to_sender_delivery_distance', 'sender_to_recipient_delivery_distance', 'ongoing_order_count', 'courier_prefer_reject', 'poi_prefer_reject']
 Binary features: []
 
 [Train Set Evaluation]
-  Accuracy:  0.7197
-  Precision: 0.9007
-  Recall:    0.7618
-  Specificity:0.4382
-  F1 Score:  0.8254
-  ROC-AUC:   0.6420
+  Accuracy:  0.8612
+  Precision: 0.9046
+  Recall:    0.9396
+  Specificity:0.3347
+  F1 Score:  0.9218
+  ROC-AUC:   0.7242
   Confusion Matrix:
-    TN= 29742  FP= 38136
-    FN=108180  TP=345920
+    TN= 22622  FP= 44976
+    FN= 27400  TP=426517
 
 [Test Set Evaluation]
-  Accuracy:  0.7178
-  Precision: 0.9014
-  Recall:    0.7592
-  Specificity:0.4361
-  F1 Score:  0.8242
-  ROC-AUC:   0.6393
+  Accuracy:  0.8607
+  Precision: 0.9039
+  Recall:    0.9396
+  Specificity:0.3350
+  F1 Score:  0.9214
+  ROC-AUC:   0.7228
   Confusion Matrix:
-    TN=  7303  FP=  9445
-    FN= 27387  TP= 86360
+    TN=  5705  FP= 11323
+    FN=  6842  TP=106509
 
 [Feature Importance]
 Feature                                            Importance
 --------------------------------------------------------------
-dispatch_to_sender_delivery_distance                   0.4039
-ongoing_order_count                                    0.2974
-fatigue                                                0.2322
-sender_to_recipient_delivery_distance                  0.0665
+courier_prefer_reject                                  0.5916
+poi_prefer_reject                                      0.3439
+ongoing_order_count                                    0.0477
+dispatch_to_sender_delivery_distance                   0.0167
+fatigue                                                0.0000
+sender_to_recipient_delivery_distance                  0.0000

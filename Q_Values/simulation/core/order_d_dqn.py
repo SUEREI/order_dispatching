@@ -16,15 +16,28 @@ import copy
 import joblib
 import logging
 import random
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
+import yaml
 from dqn.dqn_network import ActorCriticAgent, ActorCriticConfig
 from core.route import RoutePlanner
 from utils import haversine_distance, haversine_distance_vectorized
+
+# 确保项目根目录在 sys.path 中，用于加载 SPOT 模型
+_project_root = Path(__file__).resolve().parent.parent.parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from SPOT.core.smart_decision_tree import SimilaritySetDecisionTree
+
+# pickle 文件中类引用记录为 __main__.SimilaritySetDecisionTree，
+# 需要注册到 __main__ 模块才能正常反序列化
+sys.modules['__main__'].SimilaritySetDecisionTree = SimilaritySetDecisionTree
 
 logger = logging.getLogger(__name__)
 
@@ -54,17 +67,35 @@ class OrderDispatcherByActorCritic:
         'dispatch_to_sender_delivery_distance',
         'sender_to_recipient_delivery_distance',
         'ongoing_order_count',
+        'courier_prefer_reject',
+        'poi_prefer_reject',
         # 'max_ongoing_sender_to_recipient_distance',
         # 'courier_id_daily_avg_rejected_rate',
         # 'poi_id_daily_avg_rejected_rate',
     ]
+
+    @staticmethod
+    def _get_dt_model_path() -> Path:
+        """从 config.yaml 读取模型文件名，返回模型完整路径"""
+        try:
+            import yaml
+            config_path = Path(__file__).resolve().parent.parent / 'config' / 'config.yaml'
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f)
+            model_name = cfg.get('candidate_model', 'decision_tree_model.pkl')
+        except Exception:
+            model_name = 'decision_tree_model.pkl'
+        return (
+            Path(__file__).resolve().parent.parent.parent.parent
+            / 'SPOT' / 'core' / 'pkl_s' / model_name
+        )
 
     def __init__(
         self,
         route_planner: RoutePlanner,
         config: ActorCriticConfig = None,
         grab_prediction: bool = True,
-        candidate_selection: str = 'decision_tree',
+        candidate_selection: Optional[str] = None,
         dt_prob_threshold: float = 0.5,
     ):
         """初始化 Actor-Critic 分派器
@@ -76,24 +107,46 @@ class OrderDispatcherByActorCritic:
                 - 'distance': 按距离排序
                 - 'decision_tree': 先按距离筛选，再按决策树概率排序取 top-K
                 - 'decision_tree_threshold': 先按距离筛选，再按决策树概率 > 阈值筛选
+                为 None 时从 config/config.yaml 读取。
             dt_prob_threshold: decision_tree_threshold 模式的决策树概率阈值
         """
         self.route_planner = route_planner
         self.config = config or ActorCriticConfig()
         self.ac_agent = ActorCriticAgent(self.STATE_DIM, self.ACTION_DIM, self.config)
+
+        if candidate_selection is None:
+            config_path = Path(__file__).resolve().parent.parent / 'config' / 'config.yaml'
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f)
+            candidate_selection = cfg.get('candidate_method', 'distance')
+
         self.candidate_selection = candidate_selection
         self.grab_prediction = grab_prediction
         self.dt_prob_threshold = dt_prob_threshold
 
         if candidate_selection in ('decision_tree', 'decision_tree_threshold'):
-            model_path = (
-                Path(__file__).resolve().parent.parent.parent.parent
-                / 'SPOT' / 'core' / 'pkl_s' / 'decision_tree_model.pkl'
-            )
+            model_path = self._get_dt_model_path()
+            logger.info(f"尝试加载决策树模型: {model_path}")
             self.dt_model = joblib.load(model_path)
             logger.info(f"决策树模型已加载: {model_path}")
 
         logger.info(f"Actor-Critic 订单分派器初始化完成，候选筛选方式: {candidate_selection}")
+
+    def _predict_dt_score(self, features_df: pd.DataFrame) -> np.ndarray:
+        """兼容决策树分类器（predict_proba）和回归器（predict）的评分方法
+
+        Args:
+            features_df: 特征数据框
+
+        Returns:
+            评分数组，值越大表示越优
+        """
+        if hasattr(self.dt_model, 'predict_proba'):
+            # DecisionTreeClassifier: 取正类概率
+            return self.dt_model.predict_proba(features_df)[:, 1]
+        else:
+            # SimilaritySetDecisionTree (回归器): 直接用预测值
+            return self.dt_model.predict(features_df)
 
     def dispatch_orders(
         self,
@@ -143,7 +196,8 @@ class OrderDispatcherByActorCritic:
                 state_ = courier_states[chosen_index]
                 extra_feat = self._build_extra(order, chosen_courier)
                 behavior_vector = np.concatenate([state_, order_action, extra_feat])
-                grab_prob = self.predict_grab_probability(behavior_vector)
+                # grab_prob = self.predict_grab_probability(behavior_vector)
+                grab_prob = self.predict_grab_probability_dt(order, chosen_courier)
                 logger.debug(f"订单 {order['order_id']} 预测接单概率: {grab_prob:.4f}")
                 if self.grab_prediction and random.random() > grab_prob:
                     # if random.random() < 1 - grab_prob:
@@ -256,16 +310,16 @@ class OrderDispatcherByActorCritic:
             for cid, courier, dist in top_k_with_dist
         ])
         features_df = pd.DataFrame(features_list, columns=self.DT_FEATURE_NAMES)
-        probs = self.dt_model.predict_proba(features_df)[:, 1]
+        scores = self._predict_dt_score(features_df)
 
-        prob_ranked = sorted(
-            zip(top_k_with_dist, probs),
+        score_ranked = sorted(
+            zip(top_k_with_dist, scores),
             key=lambda x: x[1],
             reverse=True,
         )
         candidates = [
             (cid, courier)
-            for (cid, courier, _), _ in prob_ranked[:dt_candidate_count]
+            for (cid, courier, _), _ in score_ranked[:dt_candidate_count]
         ]
 
         return candidates
@@ -276,7 +330,7 @@ class OrderDispatcherByActorCritic:
         courier_candidates: List[Tuple[str, Dict]],
         candidate_count: int,
     ) -> List[Tuple[str, Dict]]:
-        """先按距离取候选，再用决策树预测，只保留概率 > 阈值的骑手"""
+        """先按距离取候选，再用决策树预测，只保留概率/得分 > 阈值的骑手"""
         top_k_with_dist = self._select_candidates_by_distance(order, courier_candidates, candidate_count)
 
         if not top_k_with_dist:
@@ -287,12 +341,12 @@ class OrderDispatcherByActorCritic:
             for cid, courier, dist in top_k_with_dist
         ])
         features_df = pd.DataFrame(features_list, columns=self.DT_FEATURE_NAMES)
-        probs = self.dt_model.predict_proba(features_df)[:, 1]
+        scores = self._predict_dt_score(features_df)
 
         candidates = [
             (cid, courier)
-            for (cid, courier, _), prob in zip(top_k_with_dist, probs)
-            if prob > self.dt_prob_threshold
+            for (cid, courier, _), score in zip(top_k_with_dist, scores)
+            if score > self.dt_prob_threshold
         ]
 
         # logger.info(
@@ -378,7 +432,7 @@ class OrderDispatcherByActorCritic:
         return extra
 
     def _build_dt_features(self, order: Dict, courier: Dict, dispatch_distance: float = None) -> np.ndarray:
-        features = np.zeros(4, dtype=np.float32)
+        features = np.zeros(6, dtype=np.float32)
 
         features[0] = float(courier.get('fatigue', 0.0))
 
@@ -395,6 +449,9 @@ class OrderDispatcherByActorCritic:
         features[2] = haversine_distance(order_sender, order_recipient) / 1000.0  # 转换为公里
 
         features[3] = float(len(courier.get('current_orders', [])))
+
+        features[4] = float(courier.get('courier_prefer_reject', 0))
+        features[5] = float(order.get('poi_prefer_reject', 0))
 
         # max_dist = 0.0
         # for o in courier.get('current_orders', []):
@@ -449,6 +506,32 @@ class OrderDispatcherByActorCritic:
             grab_prob = self._grab_model.predict_proba(x).item()
 
         return grab_prob
+
+    def predict_grab_probability_dt(self, order: Dict, courier: Dict, dispatch_distance: float = None) -> float:
+        """基于决策树模型预测骑手接单概率
+
+        Args:
+            order: 订单字典
+            courier: 骑手字典
+            dispatch_distance: 派单距离（米），若为 None 则自动计算
+
+        Returns:
+            grab_prob: 骑手接单概率 (0~1)
+        """
+        if not hasattr(self, 'gb_model'):
+            model_path = (
+                Path(__file__).resolve().parent.parent.parent.parent
+                / 'SPOT' / 'core' / 'pkl_s' / 'decision_tree_model_grab.pkl'
+            )
+            self.gb_model = joblib.load(model_path)
+            logger.info(f"决策树模型已加载: {model_path}")
+
+        features = self._build_dt_features(order, courier, dispatch_distance)
+        features_df = pd.DataFrame([features], columns=self.DT_FEATURE_NAMES)
+
+        prob = self.gb_model.predict_proba(features_df)[0, 1]
+
+        return float(prob)
 
     def _calculate_available_time(self, order: Dict, current_time: datetime) -> float:
         """计算新订单的可用配送时长"""

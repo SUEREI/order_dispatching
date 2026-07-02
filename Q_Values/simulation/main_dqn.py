@@ -7,11 +7,15 @@
 import copy
 import logging
 import os
+import random
 from datetime import timedelta
 from itertools import count
 from tqdm import tqdm
 
+import numpy as np
 import pandas as pd
+import torch
+from pathlib import Path
 
 from core import CourierSimulator
 from core import OrderGenerator
@@ -102,6 +106,7 @@ class DeliverySimulation:
                 'status': 'offline',
                 'position': None,
                 'rejected_rate': None,
+                'courier_prefer_reject': None,
                 'fatigue': None,
                 'order_increased': False,
                 'current_orders': [],
@@ -141,11 +146,12 @@ class DeliverySimulation:
                 
         # 2. 处理当前时间点的骑手上下线事件
         courier_events = self.courier_sim.get_events_at_time(self.current_time)
-        for cid, etype, pos, rejected_rate in courier_events:
+        for cid, etype, pos, rejected_rate, courier_prefer_reject in courier_events:
             self.couriers[cid]['status'] = etype
             if etype == 'online':
                 self.couriers[cid]['position'] = pos
                 self.couriers[cid]['rejected_rate'] = rejected_rate
+                self.couriers[cid]['courier_prefer_reject'] = courier_prefer_reject
                 self.couriers[cid]['fatigue'] = 0
                 self.couriers[cid]['has_had_orders'] = False
         online_couriers = {cid: info for cid, info in self.couriers.items() if info['status'] == 'online'}
@@ -319,17 +325,17 @@ def _log_step_info(sim, step, current_time):
     )
     buffer_size = len(sim.dispatcher_dqn.ac_agent.replay_buffer)
 
-    logger.info(
-        f"Step {step}: time={current_time}\n"
-        f"----------------------------------\n"
-        f"order_pool={sim.order_pool}\n"
-        f"pending_orders={len(sim.pending_orders)}\n"
-        f"online_couriers={online_count}\n"
-        f"delivering_orders={delivering_count}\n"
-        f"completed_orders={completed_count}\n"
-        f"replay_buffer={buffer_size}\n"
-        f"----------------------------------"
-    )
+    # logger.info(
+    #     f"Step {step}: time={current_time}\n"
+    #     f"----------------------------------\n"
+    #     f"order_pool={sim.order_pool}\n"
+    #     f"pending_orders={len(sim.pending_orders)}\n"
+    #     f"online_couriers={online_count}\n"
+    #     f"delivering_orders={delivering_count}\n"
+    #     f"completed_orders={completed_count}\n"
+    #     f"replay_buffer={buffer_size}\n"
+    #     f"----------------------------------"
+    # )
 
 
 def _log_period_summary(period, metrics):
@@ -442,6 +448,52 @@ def _save_loss_json(sim, model_path):
 
 
 def main():
+    # 先读配置（日志文件名需要用到配置内容）
+    import yaml
+    config_path = Path(__file__).resolve().parent / 'config' / 'config.yaml'
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    seed = config.get('random_seed', 42)
+
+    # 构建日志文件名：sim_{种子}_{方法}_{决策树数量}/{距离筛选数量}.log
+    candidate_method = config.get('candidate_method', 'distance')
+    candidate_model = config.get('candidate_model', 'decision_tree_model.pkl')
+
+    if candidate_method == 'distance':
+        method_tag = 'dis'
+    elif candidate_method == 'decision_tree':
+        if 'smart' in candidate_model:
+            method_tag = 'spot'
+        else:
+            method_tag = 'dt'
+    else:
+        method_tag = candidate_method
+
+    count_dis = config.get('top_k_with_dist', 300)
+    count_dt = config.get('top_k_with_dt', 200)
+
+    log_filename = f"sim_{seed}_{method_tag}_{count_dt}of{count_dis}.log"
+    log_dir = Path(__file__).resolve().parent / 'logs'
+    log_dir.mkdir(exist_ok=True)
+
+    formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s | %(message)s')
+
+    tqdm_handler = TqdmLoggingHandler()
+    tqdm_handler.setFormatter(formatter)
+
+    file_handler = logging.FileHandler(log_dir / log_filename, encoding='utf-8')
+    file_handler.setFormatter(formatter)
+
+    logger.root.handlers = [tqdm_handler, file_handler]
+
+    logger.info(f"使用随机种子: {seed}")
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
     data_path = r'Q_Values/Data/Data_Processed/cleaned_waybill_info.csv'
     model_path = r'Q_Values\simulation\dqn\checkpoints\dqn_model.pth'
 
@@ -454,7 +506,7 @@ def main():
     # 按日期筛选：设为 None 使用全部数据，或传入整数列表
     # DATE_FILTER = None
     # DATE_FILTER = [20221017, 20221018, 20221019, 20221020, 20221021, 20221022]
-    DATE_FILTER = [20221023]
+    DATE_FILTER = [20221023, 20221024]
 
     sim = DeliverySimulation(data_path, date_filter=DATE_FILTER, is_train=IS_TRAIN)
     _load_or_init_model(sim, model_path)
@@ -473,11 +525,6 @@ def main():
     }
 
     step_iter = range(1, total_steps + 1) if total_steps else count(1)
-
-    # 替换日志处理器，使日志通过 tqdm.write() 输出，进度条始终在最底部
-    tqdm_handler = TqdmLoggingHandler()
-    tqdm_handler.setFormatter(logging.Formatter('%(asctime)s | %(name)s | %(levelname)s | %(message)s'))
-    logger.root.handlers = [tqdm_handler]
 
     for step_num in tqdm(step_iter, desc="仿真进度"):
         done, current_time = sim.step()

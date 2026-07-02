@@ -1,0 +1,4 @@
+candidate_method: distance
+random_seed: 21
+top_k_with_dist: 300
+top_k_with_dt: 300
