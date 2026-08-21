@@ -97,6 +97,7 @@ class DeliverySimulation:
                 'position': None,  # 上线时会设置初始位置
                 'fatigue': 0,
                 'rejected_rate': None,
+                'courier_prefer_reject': None,
                 'has_had_orders': False,
                 'order_increased': False,
                 'current_orders': [],
@@ -135,12 +136,13 @@ class DeliverySimulation:
                 
         # 2. 处理当前时间点的骑手上下线事件
         courier_events = self.courier_sim.get_events_at_time(self.current_time)
-        for cid, etype, pos, reject_rate in courier_events:
+        for cid, etype, pos, rejected_rate, courier_prefer_reject in courier_events:
             self.couriers[cid]['status'] = etype
             if etype == 'online':
                 self.couriers[cid]['position'] = pos
                 self.couriers[cid]['fatigue'] = 0
-                self.couriers[cid]['rejected_rate'] = reject_rate
+                self.couriers[cid]['rejected_rate'] = rejected_rate
+                self.couriers[cid]['courier_prefer_reject'] = courier_prefer_reject
         online_couriers = {cid: info for cid, info in self.couriers.items() if info['status'] == 'online'}
         # logger.info(f"当前时间点 {self.current_time} 的在线骑手数量: {len(online_couriers)}")
         

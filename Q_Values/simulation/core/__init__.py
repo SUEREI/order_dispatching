@@ -7,6 +7,7 @@
 from core.courier import CourierSimulator
 from core.order_g import OrderGenerator
 from core.order_d_real import OrderDispatcherByRealMatch
+from core.order_d_dis import OrderDispatcherByDistance
 from core.order_d_dqn import OrderDispatcherByActorCritic
 from dqn.dqn_network import ActorCriticConfig
 from core.route import RoutePlanner
@@ -17,6 +18,7 @@ __all__ = [
     'CourierSimulator',
     'OrderGenerator',
     'OrderDispatcherByRealMatch',
+    'OrderDispatcherByDistance',
     'OrderDispatcherByActorCritic',
     'ActorCriticConfig',
     'RoutePlanner',
