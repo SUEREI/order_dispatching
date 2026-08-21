@@ -296,7 +296,7 @@ def filter_by_speed(df, speed_threshold):
     """
     根据配送速度过滤行数据
     去除 dispatch_to_sender_delivery_distance/(fetch_time-dispatch_time) 大于阈值的行
-    speed_threshold: 速度阈值（单位：公里/分钟）
+    speed_threshold: 速度阈值（单位：公里/小时）
     """
     df_result = df.copy()
     rows_before = len(df_result)
@@ -314,7 +314,7 @@ def filter_by_speed(df, speed_threshold):
     rows_after = len(df_result)
     rows_dropped = rows_before - rows_after
     
-    print(f"\n速度过滤统计 (阈值: {speed_threshold} 公里/分钟):")
+    print(f"\n速度过滤统计 (阈值: {speed_threshold} 公里/小时):")
     print(f"  过滤前行数: {rows_before}")
     print(f"  过滤后行数: {rows_after}")
     print(f"  过滤数量: {rows_dropped}")

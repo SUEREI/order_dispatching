@@ -174,14 +174,18 @@ class SimilarSetBuilder:
         
 
 if __name__ == '__main__':
-    from sklearn.model_selection import train_test_split
-    
     # 加载数据
     df = load_data(r'SPOT\Data\Data_Processed\cleaned_waybill_info.csv')
     df_example = load_data(r'SPOT\core\sets_build\sample_sets\sample_522093.csv', sample=False)
     
-    # 划分训练集和测试集 (7:3)
-    df_train, df_test = train_test_split(df, test_size=0.3, random_state=42)
+    # 按时序划分训练集和测试集 (7:3)
+    # 按派单时间升序排序后按比例切分，避免随机划分造成的时间泄漏
+    time_col = pd.read_csv(r'SPOT\Data\Data_Processed\cleaned_waybill_info.csv', usecols=['dispatch_time'])
+    time_col['dispatch_time'] = pd.to_datetime(time_col['dispatch_time'])
+    sorted_idx = time_col['dispatch_time'].sort_values().index
+    split_idx = int(len(df) * 0.7)
+    df_train = df.loc[sorted_idx[:split_idx]].reset_index(drop=True)
+    df_test = df.loc[sorted_idx[split_idx:]].reset_index(drop=True)
     print(f"原始数据量: {len(df)}")
     print(f"训练集数据量: {len(df_train)}")
     print(f"测试集数据量: {len(df_test)}")

@@ -471,8 +471,9 @@ def main():
 
     count_dis = config.get('top_k_with_dist', 300)
     count_dt = config.get('top_k_with_dt', 200)
+    grab_cof = config.get('grab_cof', 1)
 
-    log_filename = f"sim_{seed}_{method_tag}_{count_dt}of{count_dis}.log"
+    log_filename = f"sim_{seed}_{method_tag}_{count_dt}of{count_dis}_{grab_cof}.log"
     log_dir = Path(__file__).resolve().parent / 'logs'
     log_dir.mkdir(exist_ok=True)
 

@@ -119,6 +119,11 @@ class OrderDispatcherByActorCritic:
             with open(config_path, 'r', encoding='utf-8') as f:
                 cfg = yaml.safe_load(f)
             candidate_selection = cfg.get('candidate_method', 'distance')
+            self.grab_cof = cfg.get('grab_cof', 1)
+        else:
+            self.grab_cof = 1
+
+        logger.info(f"接单概率系数: {self.grab_cof}")
 
         self.candidate_selection = candidate_selection
         self.grab_prediction = grab_prediction
@@ -198,9 +203,14 @@ class OrderDispatcherByActorCritic:
                 behavior_vector = np.concatenate([state_, order_action, extra_feat])
                 # grab_prob = self.predict_grab_probability(behavior_vector)
                 grab_prob = self.predict_grab_probability_dt(order, chosen_courier)
+                grab_prob = grab_prob * self.grab_cof
+                # 通过控制接单概率系数，调整整体接单概率分布
+                if grab_prob > 1:
+                    grab_prob = 1
+                elif grab_prob < 0:
+                    grab_prob = 0
                 logger.debug(f"订单 {order['order_id']} 预测接单概率: {grab_prob:.4f}")
                 if self.grab_prediction and random.random() > grab_prob:
-                    # if random.random() < 1 - grab_prob:
                     logger.debug(f"订单 {order['order_id']} 骑手 {chosen_id} 接单，概率: {grab_prob:.4f}")
                     dispatch_results[order['order_id']] = chosen_id+'_reject'
                     continue

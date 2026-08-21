@@ -16,20 +16,24 @@ import yaml
 
 # 随机数种子列表（按需修改）
 SEEDS = [
-    21, 22, 24, 25,
-    41, 43, 44, 45,
-    82, 83, 84, 85
+    42
 ]
 
 # 配置组合列表
-# 每项为 (candidate_method, candidate_model, top_k_with_dist, top_k_with_dt)
+# 每项为 (candidate_method, candidate_model, top_k_with_dist, top_k_with_dt, grab_cof)
 CONFIG_COMBOS = [
     # 配置1: 纯距离筛选
-    ("distance",       None,                        300, 300),
-    # 配置2: 决策树 + 普通模型
-    ("decision_tree",  "decision_tree_model.pkl",    500, 300),
-    # 配置3: 决策树 + smart模型
-    ("decision_tree",  "smart_decision_tree_model.pkl", 500, 300),
+    # ("distance",       None,                        100, 100, 1),
+    # ("distance",       None,                        200, 200, 1),
+    # ("distance",       None,                        300, 300, 1),
+    # ("distance",       None,                        400, 400, 1),
+    # ("distance",       None,                        500, 500, 1),
+    # # 配置2: 决策树 + 普通模型
+    ("distance",  None,    300, 300, 1),
+    ("decision_tree",  "decision_tree_model_used.pkl",    500, 300, 1),
+    ("decision_tree",  "smart_decision_tree_model_used.pkl",    500, 300, 1),
+    # # 配置3: 决策树 + smart模型
+    # ("decision_tree",  "smart_decision_tree_model.pkl", 500, 300, 1),
 ]
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # 2 Python/
@@ -45,22 +49,23 @@ RUN_SERIAL = True
 # ===================== 运行逻辑 =====================
 
 
-def make_config(seed, method, model, top_k_dist, top_k_dt):
+def make_config(seed, method, model, top_k_dist, top_k_dt, grab_cof):
     """根据参数构造配置字典"""
     config = {
         "random_seed": seed,
         "candidate_method": method,
         "top_k_with_dist": top_k_dist,
         "top_k_with_dt": top_k_dt,
+        "grab_cof": grab_cof,
     }
     if model is not None:
         config["candidate_model"] = model
     return config
 
 
-def run_single(seed, method, model, top_k_dist, top_k_dt):
+def run_single(seed, method, model, top_k_dist, top_k_dt, grab_cof):
     """更新 config.yaml 并运行一次 main_dqn.py"""
-    config = make_config(seed, method, model, top_k_dist, top_k_dt)
+    config = make_config(seed, method, model, top_k_dist, top_k_dt, grab_cof)
 
     # 写配置
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -88,10 +93,10 @@ def main():
     failed = 0
 
     for seed in SEEDS:
-        for method, model, top_k_dist, top_k_dt in CONFIG_COMBOS:
-            label = f"seed={seed}_{method}_{model or 'none'}_{top_k_dt}of{top_k_dist}"
+        for method, model, top_k_dist, top_k_dt, grab_cof in CONFIG_COMBOS:
+            label = f"seed={seed}_{method}_{model or 'none'}_{top_k_dt}of{top_k_dist}_{grab_cof}"
             try:
-                rc = run_single(seed, method, model, top_k_dist, top_k_dt)
+                rc = run_single(seed, method, model, top_k_dist, top_k_dt, grab_cof)
                 if rc == 0:
                     success += 1
                     print(f"  ✓ {label}  完成")

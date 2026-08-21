@@ -2,39 +2,39 @@
 Decision Tree Classification - Predict is_courier_grabbed
 ============================================================
 Number of features: 6
-Tree depth: 3
-Number of leaves: 5
+Tree depth: 4
+Number of leaves: 7
 Continuous features: ['fatigue', 'dispatch_to_sender_delivery_distance', 'sender_to_recipient_delivery_distance', 'ongoing_order_count', 'courier_prefer_reject', 'poi_prefer_reject']
 Binary features: []
 
 [Train Set Evaluation]
-  Accuracy:  0.8612
-  Precision: 0.9046
-  Recall:    0.9396
-  Specificity:0.3347
-  F1 Score:  0.9218
-  ROC-AUC:   0.7242
+  Accuracy:  0.7233
+  Precision: 0.9390
+  Recall:    0.7297
+  Specificity:0.6804
+  F1 Score:  0.8212
+  ROC-AUC:   0.7410
   Confusion Matrix:
-    TN= 22622  FP= 44976
-    FN= 27400  TP=426517
+    TN= 40101  FP= 18840
+    FN=107431  TP=289953
 
 [Test Set Evaluation]
-  Accuracy:  0.8607
-  Precision: 0.9039
-  Recall:    0.9396
-  Specificity:0.3350
-  F1 Score:  0.9214
-  ROC-AUC:   0.7228
+  Accuracy:  0.7226
+  Precision: 0.9328
+  Recall:    0.7335
+  Specificity:0.6507
+  F1 Score:  0.8213
+  ROC-AUC:   0.7275
   Confusion Matrix:
-    TN=  5705  FP= 11323
-    FN=  6842  TP=106509
+    TN= 16712  FP=  8973
+    FN= 45272  TP=124612
 
 [Feature Importance]
 Feature                                            Importance
 --------------------------------------------------------------
-courier_prefer_reject                                  0.5916
-poi_prefer_reject                                      0.3439
-ongoing_order_count                                    0.0477
-dispatch_to_sender_delivery_distance                   0.0167
+courier_prefer_reject                                  0.4727
+poi_prefer_reject                                      0.3529
+dispatch_to_sender_delivery_distance                   0.1140
+ongoing_order_count                                    0.0605
 fatigue                                                0.0000
 sender_to_recipient_delivery_distance                  0.0000

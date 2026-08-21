@@ -57,12 +57,12 @@ def prepare_features_target(df):
 
 def train_decision_tree(X_train, y_train, X_val, y_val):
     model = DecisionTreeClassifier(
-        max_depth=3,
+        max_depth=4,
         min_samples_split=20,
         min_samples_leaf=10,
-        random_state=23,
+        random_state=42,
         ccp_alpha=0.001,
-        class_weight={0: 1, 1: 0.3},
+        class_weight='balanced',
     )
     model.fit(X_train, y_train)
     return model
@@ -212,6 +212,7 @@ def main():
 
     print('加载数据...', flush=True)
     df = load_data(data_path)
+    df = df.sort_values("dispatch_time").reset_index(drop=True)
     print(f'数据形状: {df.shape}', flush=True)
 
     print('准备特征和目标变量...', flush=True)
@@ -230,9 +231,13 @@ def main():
         print(f'  {label_name}: {cnt} ({ratio:.1f}%)', flush=True)
 
     print('划分训练集和测试集...', flush=True)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    split_rate = 0.7
+    split_idx = int(len(X)*split_rate)
+
+    X_train = X.iloc[:split_idx]
+    X_test = X.iloc[split_idx:]
+    y_train = y.iloc[:split_idx]
+    y_test = y.iloc[split_idx:]
     print(f'训练集: {len(X_train)}, 测试集: {len(X_test)}', flush=True)
 
     print('训练决策树分类模型...', flush=True)

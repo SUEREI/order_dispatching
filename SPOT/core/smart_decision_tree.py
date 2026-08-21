@@ -237,6 +237,7 @@ class SimilaritySetDecisionTree(BaseEstimator, RegressorMixin):
             return {
                 'leaf': True,
                 'value': np.average(y, weights=sample_weight) if sample_weight is not None else np.mean(y),
+                # 'value': np.mean(y) if self.a == 0.0 else (np.average(y, weights=sample_weight) if sample_weight is not None else np.mean(y)),
                 'similar_set_distribution': self._get_similar_set_distribution(similar_set_info)
             }
         
@@ -299,6 +300,7 @@ class SimilaritySetDecisionTree(BaseEstimator, RegressorMixin):
             return {
                 'leaf': True,
                 'value': np.average(y, weights=sample_weight) if sample_weight is not None else np.mean(y),
+                # 'value': np.mean(y) if self.a == 0.0 else (np.average(y, weights=sample_weight) if sample_weight is not None else np.mean(y)),
                 'similar_set_distribution': self._get_similar_set_distribution(similar_set_info)
             }
         
@@ -637,7 +639,7 @@ if __name__ == '__main__':
     
     # 处理样本权重：负样本太少，使用类别平衡权重
     from sklearn.utils.class_weight import compute_sample_weight
-    sample_weight = compute_sample_weight('balanced', y_train)
+    sample_weight = compute_sample_weight(None, y_train)
     neg_count = (y_train == 0).sum()
     pos_count = (y_train == 1).sum()
     print(f"\n类别分布: 负样本={neg_count}, 正样本={pos_count}, 比例={neg_count/pos_count:.2f}:1")
