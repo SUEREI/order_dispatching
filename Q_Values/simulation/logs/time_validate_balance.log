@@ -1,0 +1,33 @@
+2026-08-21 14:17:21,481 | __main__ | INFO | 使用随机种子: 42
+2026-08-21 14:17:26,358 | __main__ | INFO | 按日期筛选: [20221023, 20221024]，剩余 145081 条订单
+2026-08-21 14:17:26,358 | core.order_g | INFO | 正在加载订单数据
+2026-08-21 14:17:34,723 | core.order_g | INFO | 订单数据加载完成，共 145081 条订单
+2026-08-21 14:17:38,579 | core.courier | INFO | 骑手模拟器初始化完成，共生成 35288 个上下线事件
+2026-08-21 14:17:38,581 | core.courier | INFO | 涉及骑手数: 4106
+2026-08-21 14:17:38,581 | core.state | INFO | 状态刷新器初始化完成，骑手速度: 30.0 KM/H, 时间步长: 30 秒
+2026-08-21 14:17:38,581 | core.route | INFO | 路径规划器初始化完成
+2026-08-21 14:17:38,588 | dqn.dqn_network | INFO | 加载的候选骑手数量: 300, 决策树最终保留的候选骑手数: 300
+2026-08-21 14:17:38,588 | dqn.dqn_network | INFO | 奖励计算方式: time
+2026-08-21 14:17:41,979 | dqn.dqn_network | INFO | Actor-Critic 训练设备: cuda | NVIDIA GeForce RTX 4060 Laptop GPU
+2026-08-21 14:17:41,979 | dqn.dqn_network | INFO | Actor 网络结构: state_dim=27, action_dim=5, hidden_dims=[256, 128, 64]
+2026-08-21 14:17:41,979 | dqn.dqn_network | INFO | Critic 网络结构: state_dim=27, hidden_dims=[256, 128, 64]
+2026-08-21 14:17:41,979 | dqn.dqn_network | INFO | 经验回放缓冲区容量: 70000, 批次大小: 128
+2026-08-21 14:17:41,981 | core.order_d_dqn | INFO | 接单概率系数: 1
+2026-08-21 14:17:41,981 | core.order_d_dqn | INFO | Actor-Critic 订单分派器初始化完成，候选筛选方式: distance
+2026-08-21 14:17:41,981 | core.order_d_dqn | INFO | 拒单仿真: 关闭
+2026-08-21 14:17:41,984 | core.order_d_dqn | INFO | 奖励计算方式: time (时间型: 预计送达-估计送达, 缩放系数 0.016666666666666666)
+2026-08-21 14:17:42,039 | dqn.dqn_network | INFO | Actor 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-08-21 14:17:42,039 | dqn.dqn_network | INFO | Critic 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-08-21 14:17:42,039 | dqn.dqn_network | INFO | Target Critic 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-08-21 14:17:42,039 | __main__ | INFO | 已加载模型: Q_Values\simulation\dqn\checkpoints\dqn_model.pth | 模式: 评估
+2026-08-21 14:33:14,431 | __main__ | INFO | 评估模式：不记录周期指标
+2026-08-21 14:33:19,342 | __main__ | INFO | 总订单数: 145081
+已送达订单数: 145081
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 24.03分钟
+超时订单数: 19633
+超时率: 13.53%
+平均超时时长: 11.46分钟
+骑手平均订单收益: 4.62
+2026-08-21 14:33:23,096 | __main__ | INFO | 订单结果已保存到 Q_Values\simulation\simulation_result\dqn_dispatch_20221023.csv

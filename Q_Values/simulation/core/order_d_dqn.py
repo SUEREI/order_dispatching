@@ -94,7 +94,7 @@ class OrderDispatcherByActorCritic:
         self,
         route_planner: RoutePlanner,
         config: ActorCriticConfig = None,
-        grab_prediction: bool = True,
+        grab_prediction: Optional[bool] = None,
         candidate_selection: Optional[str] = None,
         dt_prob_threshold: float = 0.5,
     ):
@@ -103,6 +103,8 @@ class OrderDispatcherByActorCritic:
         Args:
             route_planner: 路径规划器
             config: 超参数配置
+            grab_prediction: 是否开启拒单仿真（基于接单概率预测）
+                为 None 时从 config/config.yaml 的 enable_reject_simulation 读取。
             candidate_selection: 候选骑手筛选方式
                 - 'distance': 按距离排序
                 - 'decision_tree': 先按距离筛选，再按决策树概率排序取 top-K
@@ -123,6 +125,13 @@ class OrderDispatcherByActorCritic:
         else:
             self.grab_cof = 1
 
+        # 拒单仿真开关：未显式传参时从 config.yaml 读取
+        if grab_prediction is None:
+            config_path = Path(__file__).resolve().parent.parent / 'config' / 'config.yaml'
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f)
+            grab_prediction = cfg.get('enable_reject_simulation', True)
+
         logger.info(f"接单概率系数: {self.grab_cof}")
 
         self.candidate_selection = candidate_selection
@@ -136,6 +145,10 @@ class OrderDispatcherByActorCritic:
             logger.info(f"决策树模型已加载: {model_path}")
 
         logger.info(f"Actor-Critic 订单分派器初始化完成，候选筛选方式: {candidate_selection}")
+        logger.info(f"拒单仿真: {'开启' if self.grab_prediction else '关闭'}")
+        logger.info(f"奖励计算方式: {self.config.reward_mode}"
+                    + (" (收益型: 基础收益+超时惩罚)" if self.config.reward_mode == 'revenue'
+                       else f" (时间型: 预计送达-估计送达, 缩放系数 {self.config.time_reward_scale})"))
 
     def _predict_dt_score(self, features_df: pd.DataFrame) -> np.ndarray:
         """兼容决策树分类器（predict_proba）和回归器（predict）的评分方法
@@ -201,35 +214,37 @@ class OrderDispatcherByActorCritic:
                 state_ = courier_states[chosen_index]
                 extra_feat = self._build_extra(order, chosen_courier)
                 behavior_vector = np.concatenate([state_, order_action, extra_feat])
-                # grab_prob = self.predict_grab_probability(behavior_vector)
-                grab_prob = self.predict_grab_probability_dt(order, chosen_courier)
-                grab_prob = grab_prob * self.grab_cof
-                # 通过控制接单概率系数，调整整体接单概率分布
-                if grab_prob > 1:
-                    grab_prob = 1
-                elif grab_prob < 0:
-                    grab_prob = 0
-                logger.debug(f"订单 {order['order_id']} 预测接单概率: {grab_prob:.4f}")
-                if self.grab_prediction and random.random() > grab_prob:
-                    logger.debug(f"订单 {order['order_id']} 骑手 {chosen_id} 接单，概率: {grab_prob:.4f}")
-                    dispatch_results[order['order_id']] = chosen_id+'_reject'
-                    continue
+                # 拒单仿真：仅开启时才预测接单概率并判定拒单
+                if self.grab_prediction:
+                    # grab_prob = self.predict_grab_probability(behavior_vector)
+                    grab_prob = self.predict_grab_probability_dt(order, chosen_courier)
+                    grab_prob = grab_prob * self.grab_cof
+                    # 通过控制接单概率系数，调整整体接单概率分布
+                    if grab_prob > 1:
+                        grab_prob = 1
+                    elif grab_prob < 0:
+                        grab_prob = 0
+                    logger.debug(f"订单 {order['order_id']} 预测接单概率: {grab_prob:.4f}")
+                    if random.random() > grab_prob:
+                        logger.debug(f"订单 {order['order_id']} 骑手 {chosen_id} 拒单，概率: {grab_prob:.4f}")
+                        dispatch_results[order['order_id']] = chosen_id+'_reject'
+                        continue
 
                 dispatch_results[order['order_id']] = chosen_id
 
                 if is_training:
-                    revenue_before = self._calculate_courier_revenue(chosen_courier, current_time)
+                    value_before = self._calculate_courier_value(chosen_courier, current_time)
                     distance_before = self._calculate_route_distance(chosen_courier)
 
                 chosen_courier['current_orders'].append(order)
                 chosen_courier['route'] = self.route_planner.plan_route(chosen_courier)
 
                 if is_training:
-                    revenue_after = self._calculate_courier_revenue(chosen_courier, current_time)
+                    value_after = self._calculate_courier_value(chosen_courier, current_time)
                     distance_after = self._calculate_route_distance(chosen_courier)
-                    marginal_revenue = revenue_after - revenue_before
+                    marginal_value = value_after - value_before
                     extra_distance_km = (distance_after - distance_before) / 1000.0
-                    reward = marginal_revenue - self.config.distance_penalty_coeff * extra_distance_km
+                    reward = marginal_value - self.config.distance_penalty_coeff * extra_distance_km
                     next_state = self._build_state(chosen_courier, current_time)
                     current_state = courier_states[chosen_index]
                     self.ac_agent.replay_buffer.push(current_state, selected_action, reward, next_state)
@@ -681,6 +696,87 @@ class OrderDispatcherByActorCritic:
             total_revenue += order_revenue
 
         return total_revenue
+
+    def _calculate_courier_time_value(
+        self,
+        courier: Dict,
+        current_time: datetime
+    ) -> float:
+        """计算骑手在当前路径规划下的预期总时间价值（时间型奖励）
+
+        对每个订单: 价值 = (预计送达时间 - 按路径估计的送达时间)
+        - 提前送达 → 正值（正向奖励），乘以 time_early_reward_weight
+        - 超时送达 → 负值（负向惩罚），乘以 time_overtime_penalty_weight
+        最终乘以 time_reward_scale 缩放（默认 1/60，即以分钟计）。
+
+        Args:
+            courier: 骑手字典（含current_orders和route）
+            current_time: 当前仿真时间
+
+        Returns:
+            预期总时间价值（缩放后）
+        """
+        total_value = 0.0
+        orders = courier.get('current_orders', [])
+        route = courier.get('route', [])
+
+        speed = self.COURIER_SPEED
+        current_pos = courier.get('position')
+        if current_pos is None:
+            return 0.0
+
+        delivery_times = {}
+        elapsed_time = 0.0
+
+        for route_point in route:
+            target_pos = route_point['position']
+            distance = haversine_distance(current_pos, target_pos)
+            travel_time = distance / (speed * 1000 / 3600)
+            elapsed_time += travel_time
+            current_pos = target_pos
+
+            order_id = route_point['order_id']
+            if route_point['point_type'] == 'delivery':
+                delivery_times[order_id] = current_time + __import__('datetime').timedelta(
+                    seconds=elapsed_time + 180
+                )
+
+        for order in orders:
+            order_id = order['order_id']
+            if order_id in delivery_times:
+                estimate_arrived = order.get('estimate_arrived_time')
+                if estimate_arrived is not None and not pd.isna(estimate_arrived):
+                    # 提前送达为正，超时为负（单位：秒）
+                    time_diff_seconds = (estimate_arrived - delivery_times[order_id]).total_seconds()
+                    if time_diff_seconds >= 0:
+                        # 提前送达: 正向奖励, 权重可调
+                        total_value += time_diff_seconds * self.config.time_early_reward_weight
+                    else:
+                        # 超时: 负向惩罚, 权重可调
+                        total_value += time_diff_seconds * self.config.time_overtime_penalty_weight
+
+        return total_value * self.config.time_reward_scale
+
+    def _calculate_courier_value(
+        self,
+        courier: Dict,
+        current_time: datetime
+    ) -> float:
+        """计算骑手在当前路径规划下的预期总价值（根据 reward_mode 自动切换）
+
+        - 'revenue': 收益型，单个订单价值 = 基础收益 + 距离收益 - 超时惩罚
+        - 'time': 时间型，单个订单价值 = (预计送达时间 - 估计送达时间) * time_reward_scale
+
+        Args:
+            courier: 骑手字典（含current_orders和route）
+            current_time: 当前仿真时间
+
+        Returns:
+            预期总价值
+        """
+        if self.config.reward_mode == 'time':
+            return self._calculate_courier_time_value(courier, current_time)
+        return self._calculate_courier_revenue(courier, current_time)
 
     def set_train_mode(self) -> None:
         """设置为训练模式"""

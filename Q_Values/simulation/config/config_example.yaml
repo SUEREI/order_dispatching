@@ -1,0 +1,23 @@
+# 示例配置文件
+
+# 候选骑手筛选方法：'distance' = 距离筛选, 'decision_tree' = 决策树筛选
+candidate_method: distance
+# 决策树模型选择
+candidate_model: None
+# 接单系数设定
+grab_cof: 1
+# 随机种子设定
+random_seed: 42
+# 筛选候选骑手数量：距离筛选
+top_k_with_dist: 300
+# 筛选候选骑手数量：决策树筛选
+top_k_with_dt: 300
+# 拒单仿真开关: true = 开启(骑手按预测接单概率拒单), false = 关闭(订单全部派给选定骑手)
+enable_reject_simulation: false
+# 奖励计算方式: 'revenue' = 收益型(基础收益+超时惩罚), 'time' = 时间型(预计送达-估计送达)
+# 切换奖励方式只需修改 reward_mode 的值
+reward_mode: time
+# 时间型奖励中提前送达的奖励权重(默认1.0): 越大, 提前送达的奖励越高
+time_early_reward_weight: 1.0
+# 时间型奖励中超时的惩罚权重(默认1.0): 越大, 超时的惩罚越重
+time_overtime_penalty_weight: 2.0

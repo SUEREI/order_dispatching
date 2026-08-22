@@ -38,8 +38,8 @@ class ActorCriticConfig:
     gamma: float = 0.99
     buffer_capacity: int = 70000
     batch_size: int = 128
-    critic_epochs: int = 16
-    actor_epochs: int = 8
+    critic_epochs: int = 8
+    actor_epochs: int = 4
     batches_per_epoch: int = buffer_capacity // batch_size
     target_update_rate: float = 0.01
     grad_clip_norm: float = 1.0
@@ -59,6 +59,14 @@ class ActorCriticConfig:
     lat_range: float = lat_max - lat_center
     reward_scale: float = 1.0
     distance_penalty_coeff: float = 0.3
+    # 奖励计算方式: 'revenue' = 收益型(基础收益+超时惩罚), 'time' = 时间型(预计送达-估计送达)
+    reward_mode: str = 'revenue'
+    # 时间型奖励的缩放系数: 时间差(秒)乘以该系数得到奖励值, 默认 1/60 表示以分钟计
+    time_reward_scale: float = 1.0 / 60.0
+    # 时间型奖励中提前送达(正时间差)的奖励权重, 默认 1.0
+    time_early_reward_weight: float = 1.0
+    # 时间型奖励中超时(负时间差)的惩罚权重, 默认 1.0; 越大超时惩罚越重
+    time_overtime_penalty_weight: float = 1.0
 
     def __post_init__(self):
         if self.actor_hidden_dims is None:
@@ -77,9 +85,18 @@ class ActorCriticConfig:
                 self.candidate_count = yaml_config['top_k_with_dist']
             if 'top_k_with_dt' in yaml_config:
                 self.dt_candidate_count = yaml_config['top_k_with_dt']
+            if 'reward_mode' in yaml_config:
+                self.reward_mode = yaml_config['reward_mode']
+            if 'time_reward_scale' in yaml_config:
+                self.time_reward_scale = yaml_config['time_reward_scale']
+            if 'time_early_reward_weight' in yaml_config:
+                self.time_early_reward_weight = yaml_config['time_early_reward_weight']
+            if 'time_overtime_penalty_weight' in yaml_config:
+                self.time_overtime_penalty_weight = yaml_config['time_overtime_penalty_weight']
         except Exception:
             pass  # 加载失败则使用类定义中的默认值
         logger.info(f"加载的候选骑手数量: {self.candidate_count}, 决策树最终保留的候选骑手数: {self.dt_candidate_count}")
+        logger.info(f"奖励计算方式: {self.reward_mode}")
 
 
 class ReplayBuffer:

@@ -1,0 +1,254 @@
+2026-08-21 12:46:49,254 | __main__ | INFO | 使用随机种子: 42
+2026-08-21 12:46:53,971 | __main__ | INFO | 按日期筛选: [20221017, 20221018, 20221019, 20221020, 20221021, 20221022]，剩余 423463 条订单
+2026-08-21 12:46:53,971 | core.order_g | INFO | 正在加载订单数据
+2026-08-21 12:47:18,229 | core.order_g | INFO | 订单数据加载完成，共 423463 条订单
+2026-08-21 12:47:34,324 | core.courier | INFO | 骑手模拟器初始化完成，共生成 110002 个上下线事件
+2026-08-21 12:47:34,352 | core.courier | INFO | 涉及骑手数: 4736
+2026-08-21 12:47:34,352 | core.state | INFO | 状态刷新器初始化完成，骑手速度: 30.0 KM/H, 时间步长: 30 秒
+2026-08-21 12:47:34,354 | core.route | INFO | 路径规划器初始化完成
+2026-08-21 12:47:34,356 | dqn.dqn_network | INFO | 加载的候选骑手数量: 300, 决策树最终保留的候选骑手数: 300
+2026-08-21 12:47:34,357 | dqn.dqn_network | INFO | 奖励计算方式: time
+2026-08-21 12:47:38,379 | dqn.dqn_network | INFO | Actor-Critic 训练设备: cuda | NVIDIA GeForce RTX 4060 Laptop GPU
+2026-08-21 12:47:38,379 | dqn.dqn_network | INFO | Actor 网络结构: state_dim=27, action_dim=5, hidden_dims=[256, 128, 64]
+2026-08-21 12:47:38,379 | dqn.dqn_network | INFO | Critic 网络结构: state_dim=27, hidden_dims=[256, 128, 64]
+2026-08-21 12:47:38,379 | dqn.dqn_network | INFO | 经验回放缓冲区容量: 70000, 批次大小: 128
+2026-08-21 12:47:38,381 | core.order_d_dqn | INFO | 接单概率系数: 1
+2026-08-21 12:47:38,381 | core.order_d_dqn | INFO | Actor-Critic 订单分派器初始化完成，候选筛选方式: distance
+2026-08-21 12:47:38,381 | core.order_d_dqn | INFO | 拒单仿真: 关闭
+2026-08-21 12:47:38,381 | core.order_d_dqn | INFO | 奖励计算方式: time (时间型: 预计送达-估计送达, 缩放系数 0.016666666666666666)
+2026-08-21 12:47:38,522 | __main__ | INFO | 未找到已保存的模型，从随机初始化开始
+2026-08-21 12:58:18,367 | __main__ | INFO | ===== 第 1 个周期结束，训练前指标 =====
+已送达订单数: 65680
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 45.62分钟
+超时率: 40.00%
+平均超时时长: 48.51分钟
+骑手平均订单收益: 4.08
+2026-08-21 12:58:18,368 | __main__ | INFO | ===== 训练网络 (buffer: 66784/70000) =====
+2026-08-21 12:58:20,110 | dqn.dqn_network | INFO | Critic 训练 | Epoch 1/16 | Avg Loss: 662.263620 | V(s) Var: 753.9613 | Explained Var: 0.1240
+2026-08-21 12:58:21,578 | dqn.dqn_network | INFO | Critic 训练 | Epoch 2/16 | Avg Loss: 627.321013 | V(s) Var: 753.6942 | Explained Var: 0.1691
+2026-08-21 12:58:23,135 | dqn.dqn_network | INFO | Critic 训练 | Epoch 3/16 | Avg Loss: 613.031293 | V(s) Var: 745.1893 | Explained Var: 0.1788
+2026-08-21 12:58:24,665 | dqn.dqn_network | INFO | Critic 训练 | Epoch 4/16 | Avg Loss: 617.821146 | V(s) Var: 762.9827 | Explained Var: 0.1924
+2026-08-21 12:58:26,160 | dqn.dqn_network | INFO | Critic 训练 | Epoch 5/16 | Avg Loss: 589.397329 | V(s) Var: 735.5442 | Explained Var: 0.2010
+2026-08-21 12:58:27,615 | dqn.dqn_network | INFO | Critic 训练 | Epoch 6/16 | Avg Loss: 602.937345 | V(s) Var: 758.2453 | Explained Var: 0.2069
+2026-08-21 12:58:29,061 | dqn.dqn_network | INFO | Critic 训练 | Epoch 7/16 | Avg Loss: 603.927242 | V(s) Var: 769.7742 | Explained Var: 0.2180
+2026-08-21 12:58:30,495 | dqn.dqn_network | INFO | Critic 训练 | Epoch 8/16 | Avg Loss: 596.739844 | V(s) Var: 761.3612 | Explained Var: 0.2195
+2026-08-21 12:58:31,928 | dqn.dqn_network | INFO | Critic 训练 | Epoch 9/16 | Avg Loss: 571.273898 | V(s) Var: 742.3602 | Explained Var: 0.2335
+2026-08-21 12:58:33,360 | dqn.dqn_network | INFO | Critic 训练 | Epoch 10/16 | Avg Loss: 566.910304 | V(s) Var: 733.1343 | Explained Var: 0.2293
+2026-08-21 12:58:34,790 | dqn.dqn_network | INFO | Critic 训练 | Epoch 11/16 | Avg Loss: 595.291892 | V(s) Var: 778.4820 | Explained Var: 0.2383
+2026-08-21 12:58:36,251 | dqn.dqn_network | INFO | Critic 训练 | Epoch 12/16 | Avg Loss: 565.425880 | V(s) Var: 742.5884 | Explained Var: 0.2427
+2026-08-21 12:58:37,694 | dqn.dqn_network | INFO | Critic 训练 | Epoch 13/16 | Avg Loss: 570.284506 | V(s) Var: 755.6716 | Explained Var: 0.2476
+2026-08-21 12:58:39,144 | dqn.dqn_network | INFO | Critic 训练 | Epoch 14/16 | Avg Loss: 557.888978 | V(s) Var: 752.1460 | Explained Var: 0.2619
+2026-08-21 12:58:40,582 | dqn.dqn_network | INFO | Critic 训练 | Epoch 15/16 | Avg Loss: 552.310669 | V(s) Var: 739.5008 | Explained Var: 0.2564
+2026-08-21 12:58:42,021 | dqn.dqn_network | INFO | Critic 训练 | Epoch 16/16 | Avg Loss: 569.926746 | V(s) Var: 768.8381 | Explained Var: 0.2616
+2026-08-21 12:58:43,383 | dqn.dqn_network | INFO | Actor 训练 | Epoch 1/8 | Avg Loss: 411.970264
+2026-08-21 12:58:44,770 | dqn.dqn_network | INFO | Actor 训练 | Epoch 2/8 | Avg Loss: 232.774475
+2026-08-21 12:58:46,134 | dqn.dqn_network | INFO | Actor 训练 | Epoch 3/8 | Avg Loss: 193.852471
+2026-08-21 12:58:47,500 | dqn.dqn_network | INFO | Actor 训练 | Epoch 4/8 | Avg Loss: 177.314394
+2026-08-21 12:58:48,860 | dqn.dqn_network | INFO | Actor 训练 | Epoch 5/8 | Avg Loss: 168.273152
+2026-08-21 12:58:50,219 | dqn.dqn_network | INFO | Actor 训练 | Epoch 6/8 | Avg Loss: 159.084601
+2026-08-21 12:58:51,580 | dqn.dqn_network | INFO | Actor 训练 | Epoch 7/8 | Avg Loss: 148.448128
+2026-08-21 12:58:52,945 | dqn.dqn_network | INFO | Actor 训练 | Epoch 8/8 | Avg Loss: 146.271957
+2026-08-21 13:09:27,060 | __main__ | INFO | ===== 第 2 个周期结束，训练前指标 =====
+已送达订单数: 135477
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 34.96分钟
+超时率: 26.85%
+平均超时时长: 42.13分钟
+骑手平均订单收益: 4.33
+2026-08-21 13:09:27,060 | __main__ | INFO | ===== 训练网络 (buffer: 70000/70000) =====
+2026-08-21 13:09:28,577 | dqn.dqn_network | INFO | Critic 训练 | Epoch 1/16 | Avg Loss: 96.069998 | V(s) Var: 126.4384 | Explained Var: 0.2513
+2026-08-21 13:09:30,014 | dqn.dqn_network | INFO | Critic 训练 | Epoch 2/16 | Avg Loss: 77.458037 | V(s) Var: 111.4336 | Explained Var: 0.3063
+2026-08-21 13:09:31,459 | dqn.dqn_network | INFO | Critic 训练 | Epoch 3/16 | Avg Loss: 80.016869 | V(s) Var: 113.3949 | Explained Var: 0.2967
+2026-08-21 13:09:32,900 | dqn.dqn_network | INFO | Critic 训练 | Epoch 4/16 | Avg Loss: 80.166526 | V(s) Var: 120.7928 | Explained Var: 0.3383
+2026-08-21 13:09:34,357 | dqn.dqn_network | INFO | Critic 训练 | Epoch 5/16 | Avg Loss: 88.730052 | V(s) Var: 128.0536 | Explained Var: 0.3088
+2026-08-21 13:09:35,817 | dqn.dqn_network | INFO | Critic 训练 | Epoch 6/16 | Avg Loss: 88.326096 | V(s) Var: 125.8749 | Explained Var: 0.2996
+2026-08-21 13:09:37,257 | dqn.dqn_network | INFO | Critic 训练 | Epoch 7/16 | Avg Loss: 91.547177 | V(s) Var: 130.3295 | Explained Var: 0.2996
+2026-08-21 13:09:38,698 | dqn.dqn_network | INFO | Critic 训练 | Epoch 8/16 | Avg Loss: 83.154578 | V(s) Var: 126.7210 | Explained Var: 0.3456
+2026-08-21 13:09:40,137 | dqn.dqn_network | INFO | Critic 训练 | Epoch 9/16 | Avg Loss: 93.315408 | V(s) Var: 137.3534 | Explained Var: 0.3230
+2026-08-21 13:09:41,567 | dqn.dqn_network | INFO | Critic 训练 | Epoch 10/16 | Avg Loss: 84.599632 | V(s) Var: 126.8462 | Explained Var: 0.3341
+2026-08-21 13:09:43,018 | dqn.dqn_network | INFO | Critic 训练 | Epoch 11/16 | Avg Loss: 97.254620 | V(s) Var: 136.8317 | Explained Var: 0.2915
+2026-08-21 13:09:44,615 | dqn.dqn_network | INFO | Critic 训练 | Epoch 12/16 | Avg Loss: 80.357085 | V(s) Var: 119.1411 | Explained Var: 0.3272
+2026-08-21 13:09:46,259 | dqn.dqn_network | INFO | Critic 训练 | Epoch 13/16 | Avg Loss: 87.732673 | V(s) Var: 128.6738 | Explained Var: 0.3203
+2026-08-21 13:09:47,847 | dqn.dqn_network | INFO | Critic 训练 | Epoch 14/16 | Avg Loss: 84.965826 | V(s) Var: 127.6392 | Explained Var: 0.3358
+2026-08-21 13:09:49,334 | dqn.dqn_network | INFO | Critic 训练 | Epoch 15/16 | Avg Loss: 96.763494 | V(s) Var: 135.5679 | Explained Var: 0.2877
+2026-08-21 13:09:50,847 | dqn.dqn_network | INFO | Critic 训练 | Epoch 16/16 | Avg Loss: 100.536154 | V(s) Var: 144.9363 | Explained Var: 0.3075
+2026-08-21 13:09:52,319 | dqn.dqn_network | INFO | Actor 训练 | Epoch 1/8 | Avg Loss: 29.720147
+2026-08-21 13:09:53,785 | dqn.dqn_network | INFO | Actor 训练 | Epoch 2/8 | Avg Loss: 28.071205
+2026-08-21 13:09:55,261 | dqn.dqn_network | INFO | Actor 训练 | Epoch 3/8 | Avg Loss: 29.734685
+2026-08-21 13:09:56,657 | dqn.dqn_network | INFO | Actor 训练 | Epoch 4/8 | Avg Loss: 24.932886
+2026-08-21 13:09:58,057 | dqn.dqn_network | INFO | Actor 训练 | Epoch 5/8 | Avg Loss: 25.719121
+2026-08-21 13:09:59,465 | dqn.dqn_network | INFO | Actor 训练 | Epoch 6/8 | Avg Loss: 24.504559
+2026-08-21 13:10:00,892 | dqn.dqn_network | INFO | Actor 训练 | Epoch 7/8 | Avg Loss: 27.120284
+2026-08-21 13:10:02,287 | dqn.dqn_network | INFO | Actor 训练 | Epoch 8/8 | Avg Loss: 25.261703
+2026-08-21 13:20:57,475 | __main__ | INFO | ===== 第 3 个周期结束，训练前指标 =====
+已送达订单数: 204276
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 30.96分钟
+超时率: 22.46%
+平均超时时长: 36.10分钟
+骑手平均订单收益: 4.42
+2026-08-21 13:20:57,475 | __main__ | INFO | ===== 训练网络 (buffer: 70000/70000) =====
+2026-08-21 13:20:59,304 | dqn.dqn_network | INFO | Critic 训练 | Epoch 1/16 | Avg Loss: 55.582173 | V(s) Var: 72.0411 | Explained Var: 0.2314
+2026-08-21 13:21:01,067 | dqn.dqn_network | INFO | Critic 训练 | Epoch 2/16 | Avg Loss: 53.294254 | V(s) Var: 70.4019 | Explained Var: 0.2451
+2026-08-21 13:21:02,685 | dqn.dqn_network | INFO | Critic 训练 | Epoch 3/16 | Avg Loss: 52.614316 | V(s) Var: 70.1867 | Explained Var: 0.2527
+2026-08-21 13:21:04,258 | dqn.dqn_network | INFO | Critic 训练 | Epoch 4/16 | Avg Loss: 57.564057 | V(s) Var: 76.1374 | Explained Var: 0.2465
+2026-08-21 13:21:05,787 | dqn.dqn_network | INFO | Critic 训练 | Epoch 5/16 | Avg Loss: 54.349227 | V(s) Var: 73.0174 | Explained Var: 0.2589
+2026-08-21 13:21:07,305 | dqn.dqn_network | INFO | Critic 训练 | Epoch 6/16 | Avg Loss: 53.525212 | V(s) Var: 72.0324 | Explained Var: 0.2593
+2026-08-21 13:21:08,843 | dqn.dqn_network | INFO | Critic 训练 | Epoch 7/16 | Avg Loss: 55.489436 | V(s) Var: 74.6564 | Explained Var: 0.2611
+2026-08-21 13:21:10,335 | dqn.dqn_network | INFO | Critic 训练 | Epoch 8/16 | Avg Loss: 52.768970 | V(s) Var: 71.9768 | Explained Var: 0.2700
+2026-08-21 13:21:11,952 | dqn.dqn_network | INFO | Critic 训练 | Epoch 9/16 | Avg Loss: 52.482561 | V(s) Var: 71.7033 | Explained Var: 0.2704
+2026-08-21 13:21:13,507 | dqn.dqn_network | INFO | Critic 训练 | Epoch 10/16 | Avg Loss: 55.452169 | V(s) Var: 74.8188 | Explained Var: 0.2622
+2026-08-21 13:21:15,063 | dqn.dqn_network | INFO | Critic 训练 | Epoch 11/16 | Avg Loss: 54.381761 | V(s) Var: 73.9125 | Explained Var: 0.2667
+2026-08-21 13:21:16,593 | dqn.dqn_network | INFO | Critic 训练 | Epoch 12/16 | Avg Loss: 55.340970 | V(s) Var: 75.3470 | Explained Var: 0.2691
+2026-08-21 13:21:18,088 | dqn.dqn_network | INFO | Critic 训练 | Epoch 13/16 | Avg Loss: 52.377376 | V(s) Var: 72.4422 | Explained Var: 0.2795
+2026-08-21 13:21:19,592 | dqn.dqn_network | INFO | Critic 训练 | Epoch 14/16 | Avg Loss: 53.619843 | V(s) Var: 72.9836 | Explained Var: 0.2696
+2026-08-21 13:21:21,327 | dqn.dqn_network | INFO | Critic 训练 | Epoch 15/16 | Avg Loss: 53.731216 | V(s) Var: 73.9335 | Explained Var: 0.2773
+2026-08-21 13:21:23,015 | dqn.dqn_network | INFO | Critic 训练 | Epoch 16/16 | Avg Loss: 55.181708 | V(s) Var: 74.8620 | Explained Var: 0.2655
+2026-08-21 13:21:24,575 | dqn.dqn_network | INFO | Actor 训练 | Epoch 1/8 | Avg Loss: 21.599928
+2026-08-21 13:21:26,133 | dqn.dqn_network | INFO | Actor 训练 | Epoch 2/8 | Avg Loss: 20.474524
+2026-08-21 13:21:27,755 | dqn.dqn_network | INFO | Actor 训练 | Epoch 3/8 | Avg Loss: 18.653641
+2026-08-21 13:21:29,301 | dqn.dqn_network | INFO | Actor 训练 | Epoch 4/8 | Avg Loss: 17.114079
+2026-08-21 13:21:30,895 | dqn.dqn_network | INFO | Actor 训练 | Epoch 5/8 | Avg Loss: 15.769243
+2026-08-21 13:21:32,522 | dqn.dqn_network | INFO | Actor 训练 | Epoch 6/8 | Avg Loss: 14.501043
+2026-08-21 13:21:34,138 | dqn.dqn_network | INFO | Actor 训练 | Epoch 7/8 | Avg Loss: 14.096711
+2026-08-21 13:21:35,706 | dqn.dqn_network | INFO | Actor 训练 | Epoch 8/8 | Avg Loss: 12.603660
+2026-08-21 13:32:50,575 | __main__ | INFO | ===== 第 4 个周期结束，训练前指标 =====
+已送达订单数: 273110
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 29.31分钟
+超时率: 20.88%
+平均超时时长: 31.99分钟
+骑手平均订单收益: 4.45
+2026-08-21 13:32:50,575 | __main__ | INFO | ===== 训练网络 (buffer: 70000/70000) =====
+2026-08-21 13:32:52,193 | dqn.dqn_network | INFO | Critic 训练 | Epoch 1/16 | Avg Loss: 55.418508 | V(s) Var: 69.9269 | Explained Var: 0.2120
+2026-08-21 13:32:53,624 | dqn.dqn_network | INFO | Critic 训练 | Epoch 2/16 | Avg Loss: 64.095991 | V(s) Var: 80.0429 | Explained Var: 0.2023
+2026-08-21 13:32:55,054 | dqn.dqn_network | INFO | Critic 训练 | Epoch 3/16 | Avg Loss: 55.769278 | V(s) Var: 71.6905 | Explained Var: 0.2256
+2026-08-21 13:32:56,494 | dqn.dqn_network | INFO | Critic 训练 | Epoch 4/16 | Avg Loss: 70.180339 | V(s) Var: 85.9461 | Explained Var: 0.1863
+2026-08-21 13:32:57,924 | dqn.dqn_network | INFO | Critic 训练 | Epoch 5/16 | Avg Loss: 71.040947 | V(s) Var: 86.4229 | Explained Var: 0.1816
+2026-08-21 13:32:59,366 | dqn.dqn_network | INFO | Critic 训练 | Epoch 6/16 | Avg Loss: 67.518470 | V(s) Var: 83.4786 | Explained Var: 0.1942
+2026-08-21 13:33:00,805 | dqn.dqn_network | INFO | Critic 训练 | Epoch 7/16 | Avg Loss: 58.995081 | V(s) Var: 75.8576 | Explained Var: 0.2247
+2026-08-21 13:33:02,254 | dqn.dqn_network | INFO | Critic 训练 | Epoch 8/16 | Avg Loss: 63.802139 | V(s) Var: 79.5267 | Explained Var: 0.2007
+2026-08-21 13:33:03,715 | dqn.dqn_network | INFO | Critic 训练 | Epoch 9/16 | Avg Loss: 74.016202 | V(s) Var: 90.6889 | Explained Var: 0.1860
+2026-08-21 13:33:05,147 | dqn.dqn_network | INFO | Critic 训练 | Epoch 10/16 | Avg Loss: 65.123549 | V(s) Var: 81.2343 | Explained Var: 0.2014
+2026-08-21 13:33:06,574 | dqn.dqn_network | INFO | Critic 训练 | Epoch 11/16 | Avg Loss: 54.747100 | V(s) Var: 70.8477 | Explained Var: 0.2311
+2026-08-21 13:33:08,005 | dqn.dqn_network | INFO | Critic 训练 | Epoch 12/16 | Avg Loss: 65.002370 | V(s) Var: 81.9639 | Explained Var: 0.2097
+2026-08-21 13:33:09,520 | dqn.dqn_network | INFO | Critic 训练 | Epoch 13/16 | Avg Loss: 53.648531 | V(s) Var: 68.9182 | Explained Var: 0.2258
+2026-08-21 13:33:10,962 | dqn.dqn_network | INFO | Critic 训练 | Epoch 14/16 | Avg Loss: 68.172326 | V(s) Var: 85.0957 | Explained Var: 0.2019
+2026-08-21 13:33:12,404 | dqn.dqn_network | INFO | Critic 训练 | Epoch 15/16 | Avg Loss: 63.035999 | V(s) Var: 79.5354 | Explained Var: 0.2095
+2026-08-21 13:33:13,889 | dqn.dqn_network | INFO | Critic 训练 | Epoch 16/16 | Avg Loss: 57.217639 | V(s) Var: 73.5285 | Explained Var: 0.2264
+2026-08-21 13:33:15,639 | dqn.dqn_network | INFO | Actor 训练 | Epoch 1/8 | Avg Loss: 15.878438
+2026-08-21 13:33:17,128 | dqn.dqn_network | INFO | Actor 训练 | Epoch 2/8 | Avg Loss: 13.288707
+2026-08-21 13:33:18,597 | dqn.dqn_network | INFO | Actor 训练 | Epoch 3/8 | Avg Loss: 11.360283
+2026-08-21 13:33:20,078 | dqn.dqn_network | INFO | Actor 训练 | Epoch 4/8 | Avg Loss: 10.725544
+2026-08-21 13:33:21,534 | dqn.dqn_network | INFO | Actor 训练 | Epoch 5/8 | Avg Loss: 11.236324
+2026-08-21 13:33:23,058 | dqn.dqn_network | INFO | Actor 训练 | Epoch 6/8 | Avg Loss: 10.702218
+2026-08-21 13:33:24,527 | dqn.dqn_network | INFO | Actor 训练 | Epoch 7/8 | Avg Loss: 10.245326
+2026-08-21 13:33:25,987 | dqn.dqn_network | INFO | Actor 训练 | Epoch 8/8 | Avg Loss: 9.338183
+2026-08-21 13:45:32,263 | __main__ | INFO | ===== 第 5 个周期结束，训练前指标 =====
+已送达订单数: 345247
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 27.87分钟
+超时率: 18.92%
+平均超时时长: 29.34分钟
+骑手平均订单收益: 4.49
+2026-08-21 13:45:32,263 | __main__ | INFO | ===== 训练网络 (buffer: 70000/70000) =====
+2026-08-21 13:45:34,305 | dqn.dqn_network | INFO | Critic 训练 | Epoch 1/16 | Avg Loss: 59.770689 | V(s) Var: 71.2212 | Explained Var: 0.1644
+2026-08-21 13:45:35,745 | dqn.dqn_network | INFO | Critic 训练 | Epoch 2/16 | Avg Loss: 60.732094 | V(s) Var: 72.9562 | Explained Var: 0.1718
+2026-08-21 13:45:37,165 | dqn.dqn_network | INFO | Critic 训练 | Epoch 3/16 | Avg Loss: 59.114901 | V(s) Var: 71.2950 | Explained Var: 0.1754
+2026-08-21 13:45:38,608 | dqn.dqn_network | INFO | Critic 训练 | Epoch 4/16 | Avg Loss: 57.260526 | V(s) Var: 69.5989 | Explained Var: 0.1798
+2026-08-21 13:45:40,035 | dqn.dqn_network | INFO | Critic 训练 | Epoch 5/16 | Avg Loss: 55.786496 | V(s) Var: 67.7273 | Explained Var: 0.1803
+2026-08-21 13:45:41,471 | dqn.dqn_network | INFO | Critic 训练 | Epoch 6/16 | Avg Loss: 55.289986 | V(s) Var: 67.7973 | Explained Var: 0.1873
+2026-08-21 13:45:42,895 | dqn.dqn_network | INFO | Critic 训练 | Epoch 7/16 | Avg Loss: 58.515511 | V(s) Var: 70.9775 | Explained Var: 0.1778
+2026-08-21 13:45:44,381 | dqn.dqn_network | INFO | Critic 训练 | Epoch 8/16 | Avg Loss: 59.691604 | V(s) Var: 72.3079 | Explained Var: 0.1781
+2026-08-21 13:45:45,905 | dqn.dqn_network | INFO | Critic 训练 | Epoch 9/16 | Avg Loss: 59.152593 | V(s) Var: 71.5407 | Explained Var: 0.1776
+2026-08-21 13:45:47,441 | dqn.dqn_network | INFO | Critic 训练 | Epoch 10/16 | Avg Loss: 60.055582 | V(s) Var: 72.4287 | Explained Var: 0.1758
+2026-08-21 13:45:48,991 | dqn.dqn_network | INFO | Critic 训练 | Epoch 11/16 | Avg Loss: 58.795159 | V(s) Var: 71.4450 | Explained Var: 0.1820
+2026-08-21 13:45:50,536 | dqn.dqn_network | INFO | Critic 训练 | Epoch 12/16 | Avg Loss: 61.494969 | V(s) Var: 74.1181 | Explained Var: 0.1735
+2026-08-21 13:45:52,095 | dqn.dqn_network | INFO | Critic 训练 | Epoch 13/16 | Avg Loss: 57.385803 | V(s) Var: 70.5991 | Explained Var: 0.1911
+2026-08-21 13:45:53,665 | dqn.dqn_network | INFO | Critic 训练 | Epoch 14/16 | Avg Loss: 61.069405 | V(s) Var: 74.3182 | Explained Var: 0.1823
+2026-08-21 13:45:55,245 | dqn.dqn_network | INFO | Critic 训练 | Epoch 15/16 | Avg Loss: 55.819017 | V(s) Var: 69.0776 | Explained Var: 0.1963
+2026-08-21 13:45:56,818 | dqn.dqn_network | INFO | Critic 训练 | Epoch 16/16 | Avg Loss: 56.739124 | V(s) Var: 69.7198 | Explained Var: 0.1921
+2026-08-21 13:45:58,345 | dqn.dqn_network | INFO | Actor 训练 | Epoch 1/8 | Avg Loss: 7.131361
+2026-08-21 13:45:59,841 | dqn.dqn_network | INFO | Actor 训练 | Epoch 2/8 | Avg Loss: 6.921703
+2026-08-21 13:46:01,348 | dqn.dqn_network | INFO | Actor 训练 | Epoch 3/8 | Avg Loss: 6.493990
+2026-08-21 13:46:02,852 | dqn.dqn_network | INFO | Actor 训练 | Epoch 4/8 | Avg Loss: 6.503516
+2026-08-21 13:46:04,359 | dqn.dqn_network | INFO | Actor 训练 | Epoch 5/8 | Avg Loss: 6.282509
+2026-08-21 13:46:05,863 | dqn.dqn_network | INFO | Actor 训练 | Epoch 6/8 | Avg Loss: 6.337756
+2026-08-21 13:46:07,381 | dqn.dqn_network | INFO | Actor 训练 | Epoch 7/8 | Avg Loss: 6.423417
+2026-08-21 13:46:08,881 | dqn.dqn_network | INFO | Actor 训练 | Epoch 8/8 | Avg Loss: 5.978462
+2026-08-21 13:59:17,020 | __main__ | INFO | ===== 第 6 个周期结束，训练前指标 =====
+已送达订单数: 422890
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 27.32分钟
+超时率: 18.53%
+平均超时时长: 26.92分钟
+骑手平均订单收益: 4.50
+2026-08-21 13:59:17,020 | __main__ | INFO | ===== 训练网络 (buffer: 70000/70000) =====
+2026-08-21 13:59:19,038 | dqn.dqn_network | INFO | Critic 训练 | Epoch 1/16 | Avg Loss: 63.334213 | V(s) Var: 80.0621 | Explained Var: 0.2129
+2026-08-21 13:59:20,433 | dqn.dqn_network | INFO | Critic 训练 | Epoch 2/16 | Avg Loss: 60.097498 | V(s) Var: 77.1192 | Explained Var: 0.2242
+2026-08-21 13:59:21,820 | dqn.dqn_network | INFO | Critic 训练 | Epoch 3/16 | Avg Loss: 62.687298 | V(s) Var: 80.8427 | Explained Var: 0.2277
+2026-08-21 13:59:23,228 | dqn.dqn_network | INFO | Critic 训练 | Epoch 4/16 | Avg Loss: 60.831265 | V(s) Var: 78.4245 | Explained Var: 0.2267
+2026-08-21 13:59:24,628 | dqn.dqn_network | INFO | Critic 训练 | Epoch 5/16 | Avg Loss: 68.147573 | V(s) Var: 86.3814 | Explained Var: 0.2148
+2026-08-21 13:59:26,051 | dqn.dqn_network | INFO | Critic 训练 | Epoch 6/16 | Avg Loss: 58.824200 | V(s) Var: 78.1668 | Explained Var: 0.2514
+2026-08-21 13:59:27,438 | dqn.dqn_network | INFO | Critic 训练 | Epoch 7/16 | Avg Loss: 61.486795 | V(s) Var: 79.6339 | Explained Var: 0.2316
+2026-08-21 13:59:28,848 | dqn.dqn_network | INFO | Critic 训练 | Epoch 8/16 | Avg Loss: 63.154589 | V(s) Var: 81.8678 | Explained Var: 0.2317
+2026-08-21 13:59:30,386 | dqn.dqn_network | INFO | Critic 训练 | Epoch 9/16 | Avg Loss: 63.025827 | V(s) Var: 81.7146 | Explained Var: 0.2325
+2026-08-21 13:59:31,881 | dqn.dqn_network | INFO | Critic 训练 | Epoch 10/16 | Avg Loss: 63.052985 | V(s) Var: 81.5676 | Explained Var: 0.2292
+2026-08-21 13:59:33,387 | dqn.dqn_network | INFO | Critic 训练 | Epoch 11/16 | Avg Loss: 62.283537 | V(s) Var: 81.3898 | Explained Var: 0.2393
+2026-08-21 13:59:34,904 | dqn.dqn_network | INFO | Critic 训练 | Epoch 12/16 | Avg Loss: 63.506310 | V(s) Var: 83.1778 | Explained Var: 0.2397
+2026-08-21 13:59:36,427 | dqn.dqn_network | INFO | Critic 训练 | Epoch 13/16 | Avg Loss: 59.817216 | V(s) Var: 79.2332 | Explained Var: 0.2488
+2026-08-21 13:59:37,987 | dqn.dqn_network | INFO | Critic 训练 | Epoch 14/16 | Avg Loss: 63.294024 | V(s) Var: 82.9138 | Explained Var: 0.2397
+2026-08-21 13:59:39,550 | dqn.dqn_network | INFO | Critic 训练 | Epoch 15/16 | Avg Loss: 64.872676 | V(s) Var: 85.2420 | Explained Var: 0.2441
+2026-08-21 13:59:41,109 | dqn.dqn_network | INFO | Critic 训练 | Epoch 16/16 | Avg Loss: 62.826159 | V(s) Var: 83.7086 | Explained Var: 0.2518
+2026-08-21 13:59:42,596 | dqn.dqn_network | INFO | Actor 训练 | Epoch 1/8 | Avg Loss: 10.296908
+2026-08-21 13:59:44,072 | dqn.dqn_network | INFO | Actor 训练 | Epoch 2/8 | Avg Loss: 9.373401
+2026-08-21 13:59:45,562 | dqn.dqn_network | INFO | Actor 训练 | Epoch 3/8 | Avg Loss: 9.467209
+2026-08-21 13:59:47,041 | dqn.dqn_network | INFO | Actor 训练 | Epoch 4/8 | Avg Loss: 8.852058
+2026-08-21 13:59:48,526 | dqn.dqn_network | INFO | Actor 训练 | Epoch 5/8 | Avg Loss: 8.655892
+2026-08-21 13:59:50,008 | dqn.dqn_network | INFO | Actor 训练 | Epoch 6/8 | Avg Loss: 8.856263
+2026-08-21 13:59:51,490 | dqn.dqn_network | INFO | Actor 训练 | Epoch 7/8 | Avg Loss: 8.996020
+2026-08-21 13:59:52,977 | dqn.dqn_network | INFO | Actor 训练 | Epoch 8/8 | Avg Loss: 8.663700
+2026-08-21 14:00:10,434 | __main__ | INFO | 周期指标曲线已保存到 Q_Values\simulation\dqn\checkpoints\dqn_model_period_metrics.png
+2026-08-21 14:00:23,818 | __main__ | INFO | 总订单数: 423463
+已送达订单数: 423463
+拒单率: 0.00%
+拒单率-非重复计数: 0.00%
+平均配送时长: 27.32分钟
+超时订单数: 78505
+超时率: 18.54%
+平均超时时长: 26.90分钟
+骑手平均订单收益: 4.50
+2026-08-21 14:00:25,577 | dqn.dqn_network | INFO | 网络参数已保存到 Q_Values\simulation\dqn\checkpoints\dqn_model.pth | actor=True, critic=True
+2026-08-21 14:00:25,577 | __main__ | INFO | DQN模型已保存到 Q_Values\simulation\dqn\checkpoints\dqn_model.pth
+2026-08-21 14:00:25,883 | dqn.dqn_network | INFO | 损失曲线已保存到 Q_Values\simulation\dqn\checkpoints\dqn_model_losses.png
+2026-08-21 14:00:25,887 | __main__ | INFO | 损失曲线已保存到 Q_Values\simulation\dqn\checkpoints\dqn_model_losses.png
+2026-08-21 14:00:25,887 | __main__ | INFO | Epoch 损失数据已保存到 Q_Values\simulation\dqn\checkpoints\dqn_model_losses.json
+2026-08-21 14:13:06,705 | __main__ | INFO | 使用随机种子: 42
+2026-08-21 14:13:11,891 | __main__ | INFO | 按日期筛选: [20221023, 20221024]，剩余 145081 条订单
+2026-08-21 14:13:11,891 | core.order_g | INFO | 正在加载订单数据
+2026-08-21 14:13:22,029 | core.order_g | INFO | 订单数据加载完成，共 145081 条订单
+2026-08-21 14:13:26,549 | core.courier | INFO | 骑手模拟器初始化完成，共生成 35288 个上下线事件
+2026-08-21 14:13:26,554 | core.courier | INFO | 涉及骑手数: 4106
+2026-08-21 14:13:26,556 | core.state | INFO | 状态刷新器初始化完成，骑手速度: 30.0 KM/H, 时间步长: 30 秒
+2026-08-21 14:13:26,556 | core.route | INFO | 路径规划器初始化完成
+2026-08-21 14:13:26,558 | dqn.dqn_network | INFO | 加载的候选骑手数量: 300, 决策树最终保留的候选骑手数: 300
+2026-08-21 14:13:26,558 | dqn.dqn_network | INFO | 奖励计算方式: time
+2026-08-21 14:13:28,980 | dqn.dqn_network | INFO | Actor-Critic 训练设备: cuda | NVIDIA GeForce RTX 4060 Laptop GPU
+2026-08-21 14:13:28,980 | dqn.dqn_network | INFO | Actor 网络结构: state_dim=27, action_dim=5, hidden_dims=[256, 128, 64]
+2026-08-21 14:13:28,980 | dqn.dqn_network | INFO | Critic 网络结构: state_dim=27, hidden_dims=[256, 128, 64]
+2026-08-21 14:13:28,980 | dqn.dqn_network | INFO | 经验回放缓冲区容量: 70000, 批次大小: 128
+2026-08-21 14:13:28,983 | core.order_d_dqn | INFO | 接单概率系数: 1
+2026-08-21 14:13:28,983 | core.order_d_dqn | INFO | Actor-Critic 订单分派器初始化完成，候选筛选方式: distance
+2026-08-21 14:13:28,985 | core.order_d_dqn | INFO | 拒单仿真: 关闭
+2026-08-21 14:13:28,985 | core.order_d_dqn | INFO | 奖励计算方式: time (时间型: 预计送达-估计送达, 缩放系数 0.016666666666666666)
+2026-08-21 14:13:29,039 | dqn.dqn_network | INFO | Actor 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-08-21 14:13:29,040 | dqn.dqn_network | INFO | Critic 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-08-21 14:13:29,040 | dqn.dqn_network | INFO | Target Critic 网络权重已从 Q_Values\simulation\dqn\checkpoints\dqn_model.pth 加载
+2026-08-21 14:13:29,040 | __main__ | INFO | 已加载模型: Q_Values\simulation\dqn\checkpoints\dqn_model.pth | 模式: 评估
