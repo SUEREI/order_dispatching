@@ -1,5 +1,6 @@
-candidate_method: distance
+candidate_method: decision_tree
+candidate_model: smart_decision_tree_model_used.pkl
 grab_cof: 1
-random_seed: 1
-top_k_with_dist: 300
+random_seed: 15
+top_k_with_dist: 500
 top_k_with_dt: 300

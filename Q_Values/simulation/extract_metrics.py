@@ -36,8 +36,8 @@ BASELINE = {
     "平均超时时长": 7.78,
 }
 
-# 文件名解析: sim_{seed}_{strategy}_*.log
-FILE_RE = re.compile(r"sim_(\d+)_(\w+)_\d+of\d+\.log")
+# 文件名解析: sim_{seed}_{strategy}_*of*[_运行序号].log
+FILE_RE = re.compile(r"sim_(\d+)_(\w+)_\d+of\d+(?:_\d+)?\.log")
 
 STRATEGY_NAMES = {
     "dis":  "距离筛选 (dis)",
@@ -314,6 +314,6 @@ if __name__ == "__main__":
         log_dir = sys.argv[1]
     else:
         log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "logs__3depth_can__4depth_grab_300of500")
+                               "logs")
         print(f"未指定日志目录，使用默认路径: {log_dir}")
     main(log_dir)
