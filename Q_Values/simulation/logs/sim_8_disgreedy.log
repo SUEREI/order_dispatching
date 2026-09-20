@@ -1,0 +1,31 @@
+2026-09-18 20:00:56,364 | __main__ | INFO | 使用随机种子: 8
+2026-09-18 20:00:59,565 | __main__ | INFO | 按日期筛选: [20221023, 20221024]，剩余 145081 条订单
+2026-09-18 20:00:59,565 | core.order_g | INFO | 正在加载订单数据
+2026-09-18 20:01:08,993 | core.order_g | INFO | 订单数据加载完成，共 145081 条订单
+2026-09-18 20:01:13,698 | core.courier | INFO | 骑手模拟器初始化完成，共生成 35288 个上下线事件
+2026-09-18 20:01:13,705 | core.courier | INFO | 涉及骑手数: 4106
+2026-09-18 20:01:13,707 | core.state | INFO | 状态刷新器初始化完成，骑手速度: 30.0 KM/H, 时间步长: 30 秒
+2026-09-18 20:01:13,707 | core.route | INFO | 路径规划器初始化完成
+2026-09-18 20:01:13,709 | dqn.dqn_network | INFO | 加载的候选骑手数量: 300, 决策树最终保留的候选骑手数: 200
+2026-09-18 20:01:13,709 | dqn.dqn_network | INFO | 奖励计算方式: revenue
+2026-09-18 20:01:17,232 | dqn.dqn_network | INFO | Actor-Critic 训练设备: cuda | NVIDIA GeForce RTX 4060 Laptop GPU
+2026-09-18 20:01:17,232 | dqn.dqn_network | INFO | Actor 网络结构: state_dim=27, action_dim=5, hidden_dims=[256, 128, 64]
+2026-09-18 20:01:17,232 | dqn.dqn_network | INFO | Critic 网络结构: state_dim=27, hidden_dims=[256, 128, 64]
+2026-09-18 20:01:17,232 | dqn.dqn_network | INFO | 经验回放缓冲区容量: 70000, 批次大小: 128
+2026-09-18 20:01:17,234 | core.order_d_dqn | INFO | 接单概率系数: 1
+2026-09-18 20:01:17,234 | core.order_d_dqn | INFO | Actor-Critic 订单分派器初始化完成，候选筛选方式: distance
+2026-09-18 20:01:17,234 | core.order_d_dqn | INFO | 拒单仿真: 开启
+2026-09-18 20:01:17,234 | core.order_d_dqn | INFO | 奖励计算方式: revenue (收益型: 基础收益+超时惩罚)
+2026-09-18 20:01:17,235 | core.order_d_dis | INFO | 距离贪心订单分派器初始化完成，骑手最大订单数: 4
+2026-09-18 20:01:17,295 | core.order_d_dqn | INFO | 决策树模型已加载: D:\Sys\Desktop\毕业论文\2 Python\SPOT\core\pkl_s\decision_tree_model_grab.pkl
+2026-09-18 20:14:45,166 | __main__ | INFO | 总订单数: 305255
+已送达订单数: 145062
+拒单数: 160174
+拒单率: 52.47%
+拒单率-非重复计数: 31.13%
+平均配送时长: 38.24分钟
+超时订单数: 57620
+超时率: 39.72%
+平均超时时长: 29.11分钟
+骑手平均订单收益: 4.13
+2026-09-18 20:14:52,930 | __main__ | INFO | 订单结果已保存到 Q_Values\simulation\simulation_result\dis_dispatch_20221023.csv

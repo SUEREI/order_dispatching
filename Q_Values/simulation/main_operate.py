@@ -179,7 +179,7 @@ class DeliverySimulation:
                         rejected_order['courier_id'] = courier_id.split('_')[0]
                         rejected_order['grab_time'] = pd.Timestamp('1970-01-01')
                         self.orders[order['order_id'] + '_' + str(current_time)] = rejected_order
-                        dispatched_orders.append(order)
+                        # 不加入 dispatched_orders：订单留在 pending_orders 中，下一时间步重新派单
                         continue
                     self.couriers[courier_id]['has_had_orders'] = True
                     self.couriers[courier_id]['order_increased'] = True

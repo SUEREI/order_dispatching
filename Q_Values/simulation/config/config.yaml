@@ -1,6 +1,3 @@
-candidate_method: decision_tree
-candidate_model: smart_decision_tree_model_used.pkl
-grab_cof: 1
-random_seed: 15
-top_k_with_dist: 500
-top_k_with_dt: 300
+enable_reject_simulation: true
+random_seed: 7
+reward_mode: time

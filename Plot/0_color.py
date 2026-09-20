@@ -1,6 +1,6 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
-from basic_set import plt_set
+from _basic_set import plt_set
 
 plt_set() # 调用你之前的绘图配置
 # 绘制Set2色卡

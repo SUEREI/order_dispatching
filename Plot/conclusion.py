@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
-from _basic_set import plt_set, save_fig, BASE_DIR
+from _basic_set import plt_set, save_fig, BASE_DIR, RESULT_DIR
 
 LOSSES_JSON = os.path.join(
     BASE_DIR, "..", "Q_Values", "simulation", "dqn", "checkpoints", "dqn_model_losses.json"
@@ -51,6 +51,15 @@ def comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_mode
     # 子图编号标注（图左上角外侧）
     fig.text(-0.005, 0.95, "(a)", fontsize=12, va='top', ha='left')
 
+    # 额外保存一份高分辨率 JPG（600 dpi）供论文插图使用
+    if save_name != 'None':
+        jpg_path = os.path.join(
+            RESULT_DIR, os.path.splitext(save_name)[0] + '_hires.jpg'
+        )
+        fig.savefig(jpg_path, dpi=600, bbox_inches='tight',
+                    facecolor='white', pad_inches=0.02)
+        print(f"高清图片保存：{jpg_path}")
+
     save_fig(save_name)
 
 
@@ -87,6 +96,106 @@ def comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_mode
 
     # 子图编号标注（图左上角外侧）
     fig.text(0.02, 0.95, "(b)", fontsize=12, va='top', ha='left')
+
+    # 额外保存一份高分辨率 JPG（600 dpi）供论文插图使用
+    if save_name != 'None':
+        jpg_path = os.path.join(
+            RESULT_DIR, os.path.splitext(save_name)[0] + '_hires.jpg'
+        )
+        fig.savefig(jpg_path, dpi=600, bbox_inches='tight',
+                    facecolor='white', pad_inches=0.02)
+        print(f"高清图片保存：{jpg_path}")
+
+    save_fig(save_name)
+
+
+def comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_models_1_en(save_name='None'):
+    """英文版：预测效用（不同深度下 CART 与 SPO 的 MSE 损失对比条形图）"""
+    depth = [1, 2, 3, 4]
+    MSE_Loss_CART = [0.1031, 0.0988, 0.0976, 0.0961]
+    MSE_Loss_SPO = [0.1127, 0.1094, 0.1090, 0.1087]
+
+    x = np.arange(len(depth))
+    width = 0.35
+    fig, ax = plt.subplots(figsize=(4, 5))
+    bars1 = ax.bar(x - width / 2, MSE_Loss_CART, width, label="CART",
+                   color=colors[0], edgecolor="white", hatch="///")
+    bars2 = ax.bar(x + width / 2, MSE_Loss_SPO, width, label="SPOT",
+                   color=colors[1], edgecolor="white")
+
+    # 在柱子上方标注数值
+    top = max(MSE_Loss_CART + MSE_Loss_SPO)
+    for bar, val in zip(bars1, MSE_Loss_CART):
+        ax.text(bar.get_x() + bar.get_width() / 2 - 0.06, bar.get_height() + top * 0.01,
+                f"{val:.4f}", ha="center", va="bottom")
+    for bar, val in zip(bars2, MSE_Loss_SPO):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + top * 0.01,
+                f"{val:.4f}", ha="center", va="bottom")
+
+    ax.set_xlabel("Depth")
+    ax.set_xticks(x)
+    ax.set_xticklabels(depth)
+    ax.set_ylabel("MSE Value")
+    ax.set_ylim(bottom=0, top=max(MSE_Loss_SPO) * 1.3)
+    ax.legend(loc="upper right", facecolor="white", edgecolor="#CCCCCC", framealpha=1)
+
+    # 子图编号标注（图左上角外侧）
+    fig.text(-0.005, 0.95, "(a)", fontsize=12, va='top', ha='left')
+
+    # 额外保存一份高分辨率 JPG（600 dpi）供论文插图使用
+    if save_name != 'None':
+        jpg_path = os.path.join(
+            RESULT_DIR, os.path.splitext(save_name)[0] + '_hires.jpg'
+        )
+        fig.savefig(jpg_path, dpi=600, bbox_inches='tight',
+                    facecolor='white', pad_inches=0.02)
+        print(f"高清图片保存：{jpg_path}")
+
+    save_fig(save_name)
+
+
+def comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_models_2_en(save_name='None'):
+    """英文版：决策效用（不同深度下 CART 与 SPO 的 SPO 损失对比条形图）"""
+    depth = [1, 2, 3, 4]
+    SPO_Loss_CART = [22.84, 20.11, 18.23, 17.57]
+    SPO_Loss_SPO = [20.39, 18.44, 17.86, 17.36]
+
+    x = np.arange(len(depth))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(4, 5))
+    bars1 = ax.bar(x - width / 2, SPO_Loss_CART, width, label="CART",
+                   color=colors[0], edgecolor="white", hatch="///")
+    bars2 = ax.bar(x + width / 2, SPO_Loss_SPO, width, label="SPOT",
+                   color=colors[1], edgecolor="white")
+
+    # 在柱子上方标注数值
+    top = max(SPO_Loss_CART + SPO_Loss_SPO)
+    for bar, val in zip(bars1, SPO_Loss_CART):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + top * 0.02,
+                f"{val:.2f}", ha="center", va="bottom")
+    for bar, val in zip(bars2, SPO_Loss_SPO):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + top * 0.00,
+                f"{val:.2f}", ha="center", va="bottom")
+
+    ax.set_xlabel("Depth")
+    ax.set_xticks(x)
+    ax.set_xticklabels(depth)
+    ax.set_ylabel("SPO Loss")
+    ax.set_ylim(bottom=0, top=max(SPO_Loss_CART) * 1.08)
+    ax.legend(loc="upper right", facecolor="white", edgecolor="#CCCCCC", framealpha=1)
+
+    # 子图编号标注（图左上角外侧）
+    fig.text(0.02, 0.95, "(b)", fontsize=12, va='top', ha='left')
+
+    # 额外保存一份高分辨率 JPG（600 dpi）供论文插图使用
+    if save_name != 'None':
+        jpg_path = os.path.join(
+            RESULT_DIR, os.path.splitext(save_name)[0] + '_hires.jpg'
+        )
+        fig.savefig(jpg_path, dpi=600, bbox_inches='tight',
+                    facecolor='white', pad_inches=0.02)
+        print(f"高清图片保存：{jpg_path}")
 
     save_fig(save_name)
 
@@ -187,6 +296,35 @@ def comparison_of_delivery_metrics_under_different_strategies(
     spot = [31.18, 11.61, 7.59, 24.89, 4.68]
     pass
 
+
+
+def main():
+    plt_set()
+
+    # 决策树预测 / 决策效用对比
+    comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_models_1(
+        save_name='不同深度下的预测MSE损失对比.svg'
+    )
+    comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_models_2(
+        save_name='不同深度下的决策SPO损失对比.svg'
+    )
+
+    # 决策树预测 / 决策效用对比（英文版）
+    comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_models_1_en(
+        save_name='不同深度下的预测MSE损失对比_en.svg'
+    )
+    comparison_of_prediction_accuracy_and_decision_utility_of_decision_tree_models_2_en(
+        save_name='不同深度下的决策SPO损失对比_en.svg'
+    )
+
+    # DQN 网络训练损失曲线
+    dqn_actor_training_loss_curve(save_name='DQN Actor训练损失曲线.svg')
+    dqn_critic_training_loss_curve(save_name='DQN Critic训练损失曲线.svg')
+
+    # DQN 各周期评估指标
+    colors = [plt.cm.Set2(i) for i in range(4)]
+    for cfg, color in zip(PERIOD_METRICS_CFG, colors):
+        dqn_period_metrics_curve(cfg, color, save_name=f"各周期{cfg['name']}.svg")
 
 
 if __name__ == '__main__':

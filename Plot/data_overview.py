@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from _basic_set import plt_set, save_fig, BASE_DIR
+from _basic_set import plt_set, save_fig, BASE_DIR, RESULT_DIR
 import time
 
 
@@ -206,6 +206,99 @@ def descriptive_statistics_of_key_variables():
     return df.describe()
 
 
+def save_fig_jpg600(save_name):
+    """以 jpg 格式、600 dpi 保存当前图并关闭窗口"""
+    os.makedirs(RESULT_DIR, exist_ok=True)
+    out_path = os.path.join(RESULT_DIR, save_name)
+    plt.savefig(out_path, bbox_inches="tight", dpi=600,
+                facecolor="white", pad_inches=0.02)
+    plt.close()
+    print(f"图片保存：{out_path}")
+
+
+def distribution_of_rejection_rate_on_different_hours_en(save_name='None'):
+    """Plot rejection rate line chart (English version)"""
+    hours = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
+             '10', '11', '12', '13', '14', '15', '16', '17', '18', '19',
+             '20', '21', '22', '23']
+    order_values = [651, 376, 252, 171, 120, 156, 424, 743, 1150, 1377, 3718,
+                    11881, 7058, 3429, 2429, 2217, 2626, 5619, 7945, 5903,
+                    3827, 2442, 1629, 989]
+    rejection_rates = [8.96, 7.94, 6.31, 4.12, 2.85, 3.78, 4.12, 2.65, 3.48, 3.77,
+              10.95, 20.47, 11.99, 7.44, 7.41, 6.68, 8.39, 13.36, 16.14,
+              14.59, 11.72, 12.47, 11.66, 10.10]
+
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+    ax2.grid(False)  # 关闭重复网格
+
+    colors = [plt.cm.Set2(i) for i in range(8)]
+    ax1.plot(hours, order_values, marker="o", linestyle="-", linewidth=1.5, markersize=3, label="Order Quantity",
+             color=colors[0])
+    ax2.plot(hours, rejection_rates, marker="^", linestyle="--", linewidth=1.5, markersize=3, label="Rejection Rate (%)",
+             color=colors[1])
+
+    ax1.set_xlabel("Hour")
+    ax1.set_xticks(hours)
+    ax1.set_ylabel("Order Quantity")
+    ax2.set_ylabel("Rejection Rate (%)")
+    ax1.set_ylim(bottom=0, top=max(order_values) * 1.08)
+    ax2.set_ylim(bottom=0, top=100)
+
+    # 合并图例
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right",
+               facecolor="white", edgecolor="#CCCCCC", framealpha=1)
+
+    # 保存图表
+    save_fig_jpg600(save_name)
+
+
+def distribution_of_rejection_rate_on_different_distance_left_en(save_name='None'):
+    """Plot rejection rate line chart (English version)"""
+    distances = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    rejection_rates_dis = [12.14, 13.94, 14.33, 22.69, 41.38, 45.72, 50.68, 84.94, 92.47, 100.00, 100.00]
+
+    colors = [plt.cm.Set2(i) for i in range(8)]
+    fig, ax = plt.subplots(figsize=(4, 5))
+    ax.plot(distances, rejection_rates_dis, marker="o", linestyle="-", linewidth=1.5, markersize=3, label="Pickup Distance",
+             color=colors[0])
+
+    ax.set_xlabel("Pickup Distance (km)")
+    ax.set_xticks(distances)
+    ax.set_ylabel("Rejection Rate (%)")
+    ax.set_ylim(bottom=0, top=105)
+
+    # 子图编号标注（图左上角外侧）
+    fig.text(-0.005, 0.95, "(a)", fontsize=12, va='top', ha='left')
+
+    # 保存图表
+    save_fig_jpg600(save_name)
+
+
+def distribution_of_rejection_rate_on_different_distance_right_en(save_name='None'):
+    """Plot rejection rate line chart (English version)"""
+    distances = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    rejection_rates_del = [9.50, 13.36, 15.24, 14.93, 10.92, 9.17, 7.66, 5.82, 5.72, 6.34, 3.16]
+
+    colors = [plt.cm.Set2(i) for i in range(8)]
+    fig, ax = plt.subplots(figsize=(4, 5))
+    ax.plot(distances, rejection_rates_del, marker="o", linestyle="-", linewidth=1.5, markersize=3, label="Delivery Distance",
+             color=colors[1])
+
+    ax.set_xlabel("Delivery Distance (km)")
+    ax.set_xticks(distances)
+    ax.set_ylabel("Rejection Rate (%)")
+    ax.set_ylim(bottom=0, top=105)
+
+    # 子图编号标注（图左上角外侧）
+    fig.text(-0.005, 0.95, "(b)", fontsize=12, va='top', ha='left')
+
+    # 保存图表
+    save_fig_jpg600(save_name)
+
+
 def main():
     plt_set()
     distribution_of_order_quantities_on_different_dates(save_name='不同日期下的订单数量分布.svg')
@@ -215,6 +308,10 @@ def main():
     distribution_of_rejection_rate_on_different_distance_left(save_name='不同接单距离下的拒单率分布.svg')
     distribution_of_rejection_rate_on_different_distance_right(save_name='不同配送距离下的拒单率分布.svg')
     descriptive_statistics_of_key_variables()
+    # 英文版（jpg, 600 dpi）
+    distribution_of_rejection_rate_on_different_hours_en(save_name='不同时间下的拒单率分布_en.jpg')
+    distribution_of_rejection_rate_on_different_distance_left_en(save_name='不同接单距离下的拒单率分布_en.jpg')
+    distribution_of_rejection_rate_on_different_distance_right_en(save_name='不同配送距离下的拒单率分布_en.jpg')
 
 if __name__ == "__main__":
     main()

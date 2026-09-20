@@ -10,6 +10,7 @@
 保持一致，便于与 DQN/Actor-Critic 派单、真实匹配派单进行对比。
 """
 
+import copy
 import logging
 import os
 import random
@@ -75,7 +76,7 @@ class DeliverySimulation:
         # 初始化派单器、路由规划器、状态刷新器
         self.state_refresher = StateRefresher()
         self.route_planner = RoutePlanner()
-        self.dispatcher_dis = OrderDispatcherByDistance(max_orders_per_courier=4)
+        self.dispatcher_dis = OrderDispatcherByDistance(self.route_planner, max_orders_per_courier=4)
 
         # 构建骑手池
         self.couriers = {}
@@ -169,6 +170,15 @@ class DeliverySimulation:
             for order in self.pending_orders:
                 if order['order_id'] in dispatch_results:
                     courier_id = dispatch_results[order['order_id']]
+                    if courier_id.endswith('_reject'):
+                        # 拒单：记录为 rejected 订单（与 main_dqn.py 一致）
+                        rejected_order = copy.deepcopy(self.orders[order['order_id']])
+                        rejected_order['status'] = 'rejected'
+                        rejected_order['courier_id'] = courier_id.split('_')[0]
+                        rejected_order['grab_time'] = pd.Timestamp('1970-01-01')
+                        self.orders[order['order_id'] + '_' + str(current_time)] = rejected_order
+                        # 不加入 dispatched_orders：订单留在 pending_orders 中，下一时间步重新派单
+                        continue
                     self.couriers[courier_id]['has_had_orders'] = True
                     self.couriers[courier_id]['order_increased'] = True
                     self.couriers[courier_id]['current_orders'].append(order)
@@ -316,8 +326,8 @@ def main():
         config = yaml.safe_load(f)
     seed = config.get('random_seed', 42)
 
-    # 构建日志文件名：sim_{种子}_dis.log
-    log_filename = f"sim_{seed}_dis.log"
+    # 构建日志文件名：sim_{种子}_disgreedy.log
+    log_filename = f"sim_{seed}_disgreedy.log"
     log_dir = Path(__file__).resolve().parent / 'logs'
     log_dir.mkdir(exist_ok=True)
 
